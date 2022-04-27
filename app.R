@@ -1,11 +1,12 @@
-setwd("C:/Users/abomb/OneDrive - Emory University/bacteria/ICMC")
+setwd("/home/ubuntu/shinyApp/ICMC/")
+
 library(shiny)
 library(ggtree)
 library(ggplot2)
 
-data<-ape::read.tree(file = "C:/Users/abomb/OneDrive - Emory University/bacteria/ICMC/staphylococcus-aureus_consensus.nwk")
+data<-ape::read.tree(file = "./data/staphylococcus-aureus_consensus.nwk")
 
-rawDat<-read.csv("C:/Users/abomb/OneDrive - Emory University/bacteria/ICMC/shinyMetadat.csv")
+rawDat<-read.csv("./data/shinyMetadat.csv")
 rawDat$Time<-as.Date(rawDat$Time, format="%m/%d/%Y")
 rawDat$Year<-format(rawDat$Time, format="%Y")
 byYear <- split(rawDat, rawDat$Year)
