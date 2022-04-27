@@ -1,4 +1,4 @@
-setwd("/home/ubuntu/shinyApp/ICMC/")
+#setwd("/home/ubuntu/shinyApp/ICMC/")
 
 library(shiny)
 library(ggtree)
