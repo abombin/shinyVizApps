@@ -50,8 +50,12 @@ ui <- navbarPage("Summary",
                                 plotOutput(outputId = "tree"),
                                 br(),
                                 br(),
-                                
-                                splitLayout(cellWidths = c("80%", "20%"), plotOutput("Time"), plotOutput("Pie"))
+                                br(),
+                                plotOutput(outputId="Time"),
+                                br(),
+                                br(),
+                                br(),
+                                splitLayout(cellWidths = c("50%", "50%"), plotOutput("Bar"), plotOutput("Pie"))
                               )
                             )),
                    tabPanel("Meta Data", fluid=T,
@@ -62,7 +66,6 @@ ui <- navbarPage("Summary",
                    
                  )
 )
-
 
 server <- function(input, output) {
   
@@ -83,7 +86,10 @@ server <- function(input, output) {
       geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border  
       theme(legend.position = c(0.5,0.2), 
             legend.title = element_blank(), # no title
-            legend.key = element_blank())
+            legend.key = element_blank())+
+      theme(text = element_text(size = 24))+
+      guides(colour = guide_legend(override.aes = list(size=10)))
+    
   })
   
   
@@ -96,6 +102,18 @@ server <- function(input, output) {
       theme_void()+
       scale_fill_discrete(name = title0)
   }, res = 150)
+  
+  output$Bar<-renderPlot({
+    title0<-as.character(input$varOption)
+    varSum<-data.frame(table(metaDat[,input$varOption]))
+    ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
+      geom_bar(stat="identity")+
+      theme_classic()+
+      theme(text = element_text(size = 24))+ 
+      scale_fill_discrete(name = title0)+
+      xlab(title0)
+    
+  })
   
   output$Time<-renderPlot({
     title0<-as.character(input$varOption)
