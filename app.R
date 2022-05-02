@@ -1,4 +1,4 @@
-setwd("/home/ubuntu/shinyApp/ICMC/")
+#setwd("/home/ubuntu/shinyApp/ICMC/")
 
 library(shiny)
 library(ggtree)
@@ -37,15 +37,15 @@ for (year in dateNames){
 
 metaDat<-sumData
 
-# Define UI for miles per gallon app ----
+
 ui <- navbarPage("Summary",
                  tabsetPanel(
                    tabPanel("Phylogeny", fluid=T,
                             fluidPage(
-                              sidebarPanel(selectInput(inputId = "varColor",
-                                                       label = "Color",
-                                                       choices = c(names(metaDat)),
-                                                       selected = "State"), width=5),
+                              selectInput(inputId = "varOption",
+                                          label = "Option",
+                                          choices = c(names(metaDat[2:ncol(metaDat)]))),
+                              textInput(inputId = "optionB", label= "Filter"),
                               mainPanel(
                                 plotOutput(outputId = "tree"),
                                 br(),
@@ -66,21 +66,30 @@ ui <- navbarPage("Summary",
 
 server <- function(input, output) {
   
-  make_tree<-reactive({ggtree::ggtree(data)%<+% metaDat + 
+  output$tree <- renderPlot({
+    if (input$optionB==""){
+      tips<-metaDat
+    } else {
+      colInput<-data.frame(metaDat[, input$varOption])
+      uuid<-data.frame(metaDat$uuid)
+      varOption<-cbind(uuid, colInput)
+      colnames(varOption)<-c("uuid", "varOption")
+      tips<-varOption[(varOption$varOption==input$optionB),]
+    }
+    selTips<-as.character(tips$uuid)
+    selTree<-ape::keep.tip(data, tip=selTips)
+    ggtree::ggtree(selTree)%<+% metaDat + 
       geom_treescale() +
-      geom_tiplab(aes(color = .data[[input$varColor]])) + # size of label border  
+      geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border  
       theme(legend.position = c(0.5,0.2), 
             legend.title = element_blank(), # no title
             legend.key = element_blank())
   })
   
-  output$tree <- renderPlot({
-    make_tree()
-  })
   
   output$Pie<-renderPlot({
-    title0<-as.character(input$varColor)
-    varSum<-data.frame(table(metaDat[,input$varColor]))
+    title0<-as.character(input$varOption)
+    varSum<-data.frame(table(metaDat[,input$varOption]))
     ggplot(varSum, aes(x="", y=Freq, fill=Var1))+
       geom_bar(stat="identity", width=1)+
       coord_polar("y", start=0)+
@@ -89,10 +98,10 @@ server <- function(input, output) {
   }, res = 150)
   
   output$Time<-renderPlot({
-    title0<-as.character(input$varColor)
+    title0<-as.character(input$varOption)
     time_plot<-ggplot(metaDat, aes(x=Time, y= PointPos))+
       geom_segment(data=metaDat, aes(y=PointPos,yend=0,xend=Time))+
-      geom_point(aes(color=.data[[input$varColor]]), size=3)+
+      geom_point(aes(color=.data[[input$varOption]]), size=3)+
       geom_text(data=metaDat, aes(y=TextPos, x= Time, label=uuid), size=2)+
       geom_hline(yintercept=0, color = "black", size=0.3)+
       theme_classic()+
