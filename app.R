@@ -1,8 +1,11 @@
+# map needs on the server: sudo apt install libgdal-dev
+
 #setwd("/home/ubuntu/shinyApp/ICMC/")
 
 library(shiny)
 library(ggtree)
 library(ggplot2)
+library(leaflet)
 
 data<-ape::read.tree(file = "./data/staphylococcus-aureus_consensus.nwk")
 
@@ -43,7 +46,7 @@ ui <- navbarPage("Summary",
                    tabPanel("Phylogeny", fluid=T,
                             fluidPage(
                               selectInput(inputId = "varOption",
-                                          label = "Option",
+                                          label = "Select Column",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
                               textInput(inputId = "optionB", label= "Filter"),
                               mainPanel(
@@ -61,8 +64,19 @@ ui <- navbarPage("Summary",
                    tabPanel("Meta Data", fluid=T,
                             fluidPage(
                               mainPanel(DT::dataTableOutput("metaDat", width = 500))
-                            )
-                   )
+                            )),
+                   tabPanel("Map", fluid=T,
+                            fluidPage(
+                              br(),
+                              selectInput(inputId = "mapOption",
+                                          label = "Select Column",
+                                          choices = c(names(metaDat[2:ncol(metaDat)]))),
+                              textInput(inputId = "mapFilter", label= "Filter"),
+                              br(),
+                              
+                              mainPanel(
+                                uiOutput("leaf")
+                              )))
                    
                  )
 )
@@ -129,9 +143,29 @@ server <- function(input, output) {
   },res = 150)
   
   output$metaDat <- DT::renderDataTable(
-    metaDat,
-    options = list(scrollX = TRUE)
-  )
+    metaDat, options = list(scrollX = TRUE))
+  
+  output$leaf=renderUI({
+    leafletOutput('Map', width = "150%", height = 700)
+  })
+  
+  output$Map<-renderLeaflet({
+    if (input$mapFilter==""){
+      mapMeta<-metaDat
+    } else {
+      colInput<-data.frame(metaDat[, input$mapOption])
+      uuid<-data.frame(metaDat$uuid)
+      mapOption<-cbind(uuid, colInput)
+      colnames(mapOption)<-c("uuid", "mapOption")
+      selId<-mapOption[(mapOption$mapOption==input$mapFilter),]
+      mapMeta<-metaDat[(metaDat$uuid%in%selId$uuid),]
+    }
+    m<-leaflet(options = leafletOptions(zoomControl = FALSE)) %>% 
+      addTiles() %>%
+      addMarkers(data = mapMeta, lat = ~ lat, lng = ~ lng, clusterOptions = markerClusterOptions(), 
+                 popup = ~uuid)
+    m
+  })
   
 }
 
