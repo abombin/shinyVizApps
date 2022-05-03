@@ -1,4 +1,4 @@
 library(shiny)
-setwd("C:/Users/abomb/OneDrive - Emory University/bacteria/ICMC")
-
-runApp(appDir="shinyApp", host = getOption("shiny.host", "127.0.0.1"), port=3269)
+setwd("./")
+print(" app is running on:  http://10.66.123.250:4000/")
+runApp(appDir="./", host = getOption("shiny.host", "10.66.123.250"), port=4000)
