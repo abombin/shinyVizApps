@@ -1,45 +1,3 @@
-# map needs on the server: sudo apt install libgdal-dev
-
-#setwd("/home/ubuntu/ICMC/IcmcVizApp")
-
-library(shiny)
-library(ggtree)
-library(ggplot2)
-library(leaflet)
-
-data<-ape::read.tree(file = "./data/staphylococcus-aureus_consensus.nwk")
-
-rawDat<-read.csv("./data/shinyMetadat.csv")
-rawDat$Time<-as.Date(rawDat$Time, format="%m/%d/%Y")
-rawDat$Year<-format(rawDat$Time, format="%Y")
-byYear <- split(rawDat, rawDat$Year)
-dateNames <- names(byYear)
-
-# empty frames
-sumData<-data.frame(matrix(ncol=9, nrow=0))
-#colnames(sumData)<-c("PangLin", "Frequency", "Date", "Percentage")
-
-for (year in dateNames){
-  procDat<-byYear[[year]]
-  dfRow<-c(1:nrow(procDat))
-  dfSub2 <- dfRow[seq(from=2, to=length(dfRow), by=2)]
-  posSeq<-seq(from=0.25, by=0.25, length.out = (nrow(procDat)/2)) # make sequence that increases by 0.25
-  
-  procDat$sign<-rep(c(1,-1))
-  pos<-vector()
-  for (i in posSeq){
-    pos<-append(pos, rep(i,2))
-  }
-  procDat$poisiton<-pos
-  
-  procDat$PointPos<-procDat$poisiton*procDat$sign
-  procDat$TextPos<-(procDat$poisiton+0.1)*procDat$sign
-  procDat$Time<-as.Date(procDat$Time, format="%m/%d/%Y")
-  sumData<-rbind(sumData, procDat)
-}
-
-metaDat<-sumData
-
 runSum<-read.table("./data/bactopia-report.txt", T, sep="\t")
 colnames(runSum)[1]<-"uuid"
 
@@ -196,7 +154,7 @@ server <- function(input, output) {
         scale_fill_discrete(name = title0)+
         xlab(title0)+
         scale_y_continuous(expand = c(0, 0.1))
-      
+        
       
     }
   })

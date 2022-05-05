@@ -1,45 +1,3 @@
-# map needs on the server: sudo apt install libgdal-dev
-
-#setwd("/home/ubuntu/ICMC/IcmcVizApp")
-
-library(shiny)
-library(ggtree)
-library(ggplot2)
-library(leaflet)
-
-data<-ape::read.tree(file = "./data/staphylococcus-aureus_consensus.nwk")
-
-rawDat<-read.csv("./data/shinyMetadat.csv")
-rawDat$Time<-as.Date(rawDat$Time, format="%m/%d/%Y")
-rawDat$Year<-format(rawDat$Time, format="%Y")
-byYear <- split(rawDat, rawDat$Year)
-dateNames <- names(byYear)
-
-# empty frames
-sumData<-data.frame(matrix(ncol=9, nrow=0))
-#colnames(sumData)<-c("PangLin", "Frequency", "Date", "Percentage")
-
-for (year in dateNames){
-  procDat<-byYear[[year]]
-  dfRow<-c(1:nrow(procDat))
-  dfSub2 <- dfRow[seq(from=2, to=length(dfRow), by=2)]
-  posSeq<-seq(from=0.25, by=0.25, length.out = (nrow(procDat)/2)) # make sequence that increases by 0.25
-  
-  procDat$sign<-rep(c(1,-1))
-  pos<-vector()
-  for (i in posSeq){
-    pos<-append(pos, rep(i,2))
-  }
-  procDat$poisiton<-pos
-  
-  procDat$PointPos<-procDat$poisiton*procDat$sign
-  procDat$TextPos<-(procDat$poisiton+0.1)*procDat$sign
-  procDat$Time<-as.Date(procDat$Time, format="%m/%d/%Y")
-  sumData<-rbind(sumData, procDat)
-}
-
-metaDat<-sumData
-
 runSum<-read.table("./data/bactopia-report.txt", T, sep="\t")
 colnames(runSum)[1]<-"uuid"
 
@@ -182,22 +140,9 @@ server <- function(input, output) {
     histTable<-as.data.frame(runSum[,input$sumOption])
     if (is.numeric(runSum[,input$sumOption])==T){
       ggplot(runSum, aes(x=.data[[input$sumOption]])) +
-        geom_histogram(fill="#f8766d", alpha=1, position="identity")+
-        theme_classic()+
-        theme(text = element_text(size = 24))+
-        scale_y_continuous(expand = c(0, 0.1))
+        geom_histogram(fill="#f8766d", alpha=1, position="identity")
     } else{
-      title0<-as.character(input$sumOption)
-      varSum<-data.frame(table(runSum[,input$sumOption]))
-      ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
-        geom_bar(stat="identity")+
-        theme_classic()+
-        theme(text = element_text(size = 24))+ 
-        scale_fill_discrete(name = title0)+
-        xlab(title0)+
-        scale_y_continuous(expand = c(0, 0.1))
-      
-      
+      print("character")
     }
   })
   
