@@ -33,7 +33,7 @@ for (year in dateNames){
   procDat$poisiton<-pos
   
   procDat$PointPos<-procDat$poisiton*procDat$sign
-  procDat$TextPos<-(procDat$poisiton+0.1)*procDat$sign
+  procDat$TextPos<-(procDat$poisiton+0.2)*procDat$sign
   procDat$Time<-as.Date(procDat$Time, format="%m/%d/%Y")
   sumData<-rbind(sumData, procDat)
 }
@@ -55,23 +55,27 @@ ui <- navbarPage("Summary",
                               br(),
                               br(),
                               mainPanel(
-                                plotOutput(outputId = "tree"),
+                                plotOutput(outputId = "tree",width = "155%"),
                                 br(),
                                 br(),
                                 br(),
                                 br(),
-                                plotOutput(outputId="Time"),
+                                plotOutput(outputId="Time", width="150%"),
                                 br(),
                                 br(),
                                 br(),
                                 br(),
                                 br(),
-                                splitLayout(cellWidths = c("50%", "50%"), plotOutput("Bar"), plotOutput("Pie"))
+                                plotOutput("Bar", width = "150%"), 
+                                br(),
+                                br(),
+                                br(),
+                                plotOutput("Pie", width="150%")
                               )
                             )),
                    tabPanel("Meta Data", fluid=T,
                             fluidPage(
-                              mainPanel(DT::dataTableOutput("metaDat", width = 500))
+                              mainPanel(DT::dataTableOutput("metaDat", width = "150%"))
                             )),
                    tabPanel("Map", fluid=T,
                             fluidPage(
@@ -96,7 +100,11 @@ ui <- navbarPage("Summary",
                                 br(),
                                 br(),
                                 br(),
-                                plotOutput("sumFig")
+                                plotOutput("sumFig", width="150%"),
+                                br(),
+                                br(),
+                                br(),
+                                DT::dataTableOutput("bactSumDat", width = "150%")
                               )
                             ))
                    
@@ -118,15 +126,18 @@ server <- function(input, output) {
     selTips<-as.character(tips$uuid)
     selTree<-ape::keep.tip(data, tip=selTips)
     ggtree::ggtree(selTree)%<+% metaDat + 
-      geom_treescale() +
-      ggtitle("Samples Phylogenetic Tree")+
-      theme(plot.title = element_text(hjust = 0.5))+
-      geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border  
+      #geom_treescale() +
+      geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
+      #xlim(0, 0.006)+
+      theme_tree2()+
+      hexpand(0.2, direction = 1)+
       theme(legend.position = c(0.5,0.2), 
             legend.title = element_blank(), # no title
             legend.key = element_blank())+
       theme(text = element_text(size = 24))+
-      guides(colour = guide_legend(override.aes = list(size=10)))
+      guides(colour = guide_legend(override.aes = list(size=10)))+
+      ggtitle("Samples Phylogenetic Tree")+
+      theme(plot.title = element_text(hjust = 0.5))
     
   })
   
@@ -146,6 +157,7 @@ server <- function(input, output) {
   output$Bar<-renderPlot({
     title0<-as.character(input$varOption)
     varSum<-data.frame(table(metaDat[,input$varOption]))
+    valMax<-max(varSum$Freq)+3
     ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
       geom_bar(stat="identity")+
       theme_classic()+
@@ -153,7 +165,8 @@ server <- function(input, output) {
       scale_fill_discrete(name = title0)+
       xlab(title0)+
       ggtitle(paste0("Frequency of samples for ", title0))+
-      theme(plot.title = element_text(hjust = 0.5))
+      theme(plot.title = element_text(hjust = 0.5))+
+      ylim(0, valMax)
     
   })
   
@@ -215,20 +228,25 @@ server <- function(input, output) {
     } else{
       title0<-as.character(input$sumOption)
       varSum<-data.frame(table(runSum[,input$sumOption]))
+      valMax<-max(varSum$Freq)+3
       ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
         geom_bar(stat="identity")+
         theme_classic()+
         theme(text = element_text(size = 24))+ 
         scale_fill_discrete(name = title0)+
         xlab(title0)+
-        scale_y_continuous(expand = c(0, 0.1))+
+        #scale_y_continuous(expand = c(0, 0.1))+
         ggtitle(paste0("Bactopia Run Summary"))+
-        theme(plot.title = element_text(hjust = 0.5))
+        theme(plot.title = element_text(hjust = 0.5))+
+        ylim(0, valMax)
       
       
       
     }
   })
+  
+  output$bactSumDat <- DT::renderDataTable(
+    runSum, options = list(scrollX = TRUE))
   
 }
 
