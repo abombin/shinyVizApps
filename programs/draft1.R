@@ -1,3 +1,46 @@
+library(shiny)
+library(ggtree)
+library(ggplot2)
+library(leaflet)
+
+data<-ape::read.tree(file = "./data/staphylococcus-aureus_consensus.nwk")
+
+rawDat<-read.csv("./data/shinyMetadat.csv")
+rawDat$Time<-as.Date(rawDat$Time, format="%m/%d/%Y")
+rawDat$Year<-format(rawDat$Time, format="%Y")
+byYear <- split(rawDat, rawDat$Year)
+dateNames <- names(byYear)
+
+# empty frames
+sumData<-data.frame(matrix(ncol=9, nrow=0))
+#colnames(sumData)<-c("PangLin", "Frequency", "Date", "Percentage")
+
+for (year in dateNames){
+  procDat<-byYear[[year]]
+  dfRow<-c(1:nrow(procDat))
+  dfSub2 <- dfRow[seq(from=2, to=length(dfRow), by=2)]
+  posSeq<-seq(from=0.25, by=0.25, length.out = (nrow(procDat)/2)) # make sequence that increases by 0.25
+  
+  procDat$sign<-rep(c(1,-1))
+  pos<-vector()
+  for (i in posSeq){
+    pos<-append(pos, rep(i,2))
+  }
+  procDat$poisiton<-pos
+  
+  procDat$PointPos<-procDat$poisiton*procDat$sign
+  procDat$TextPos<-(procDat$poisiton+0.2)*procDat$sign
+  procDat$Time<-as.Date(procDat$Time, format="%m/%d/%Y")
+  sumData<-rbind(sumData, procDat)
+}
+
+metaDat<-sumData
+
+runSum<-read.table("./data/bactopia-report.txt", T, sep="\t")
+colnames(runSum)[1]<-"uuid"
+
+linebreaks <- function(n){HTML(strrep(br(), n))}  # introduce multiple breaks in one function
+
 ui <- navbarPage("Summary",
                  tabsetPanel(
                    tabPanel("Phylogeny", fluid=T,
@@ -5,7 +48,8 @@ ui <- navbarPage("Summary",
                               selectInput(inputId = "varOption",
                                           label = "Select Column",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
-                              textInput(inputId = "optionB", label= "Filter"),
+                              splitLayout(cellWidths=c("50%", "50%"), textInput(inputId = "optionB", label= "Filter"), 
+                                          textInput(inputId = "treeRoot", label= "Root")),
                               br(),
                               br(),
                               br(),
@@ -78,17 +122,23 @@ server <- function(input, output) {
       colnames(varOption)<-c("uuid", "varOption")
       tips<-varOption[(varOption$varOption==input$optionB),]
     }
+
     selTips<-as.character(tips$uuid)
     selTree<-ape::keep.tip(data, tip=selTips)
-    ggtree::ggtree(selTree)%<+% metaDat + 
+    if (input$treeRoot==""){
+      rootTree<-selTree
+    } else {
+      rootTree<-ape::root(selTree, outgroup=input$treeRoot)
+    }
+    ggtree::ggtree(rootTree)%<+% metaDat + 
       #geom_treescale() +
       geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
       #xlim(0, 0.006)+
       theme_tree2()+
       hexpand(0.2, direction = 1)+
-      theme(legend.position = c(0.5,0.2), 
-            legend.title = element_blank(), # no title
-            legend.key = element_blank())+
+      #theme(legend.position = c(0.5,0.2), 
+            #legend.title = element_blank(), # no title
+            #legend.key = element_blank())+
       theme(text = element_text(size = 24))+
       guides(colour = guide_legend(override.aes = list(size=10)))+
       ggtitle("Samples Phylogenetic Tree")+
