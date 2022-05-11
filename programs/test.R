@@ -2,6 +2,8 @@
 
 #setwd("/home/ubuntu/github/shinyApp/IcmcVizApp")
 
+
+
 library(shiny)
 library(ggtree)
 library(ggplot2)
@@ -33,7 +35,7 @@ for (year in dateNames){
   procDat$poisiton<-pos
   
   procDat$PointPos<-procDat$poisiton*procDat$sign
-  procDat$TextPos<-(procDat$poisiton+0.15)*procDat$sign
+  procDat$TextPos<-(procDat$poisiton+0.2)*procDat$sign
   procDat$Time<-as.Date(procDat$Time, format="%m/%d/%Y")
   sumData<-rbind(sumData, procDat)
 }
@@ -43,6 +45,8 @@ metaDat<-sumData
 runSum<-read.table("./data/bactopia-report.txt", T, sep="\t")
 colnames(runSum)[1]<-"uuid"
 
+linebreaks <- function(n){HTML(strrep(br(), n))}  # introduce multiple breaks in one function
+
 ui <- navbarPage("Summary",
                  tabsetPanel(
                    tabPanel("Phylogeny", fluid=T,
@@ -50,28 +54,24 @@ ui <- navbarPage("Summary",
                               selectInput(inputId = "varOption",
                                           label = "Select Column",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
-                              textInput(inputId = "optionB", label= "Filter"),
-                              br(),
-                              br(),
-                              br(),
+                              splitLayout(cellWidths=c("50%", "50%"), textInput(inputId = "optionB", label= "Filter"), 
+                                          textInput(inputId = "treeRoot", label= "Root")),
+                              linebreaks(1),
+                              actionButton(inputId ="goRoot", "Make Tree"),
+                              linebreaks(3),
                               mainPanel(
-                                plotOutput(outputId = "tree"),
-                                br(),
-                                br(),
-                                br(),
-                                br(),
-                                plotOutput(outputId="Time"),
-                                br(),
-                                br(),
-                                br(),
-                                br(),
-                                br(),
-                                splitLayout(cellWidths = c("50%", "50%"), plotOutput("Bar"), plotOutput("Pie"))
+                                plotOutput(outputId = "tree",width = "155%"),
+                                linebreaks(4),
+                                plotOutput(outputId="Time", width="150%"),
+                                linebreaks(5),
+                                plotOutput("Bar", width = "150%"), 
+                                linebreaks(3),
+                                plotOutput("Pie", width="150%")
                               )
                             )),
                    tabPanel("Meta Data", fluid=T,
                             fluidPage(
-                              mainPanel(DT::dataTableOutput("metaDat", width = 500))
+                              mainPanel(DT::dataTableOutput("metaDat", width = "150%"))
                             )),
                    tabPanel("Map", fluid=T,
                             fluidPage(
@@ -80,23 +80,21 @@ ui <- navbarPage("Summary",
                                           label = "Select Column",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
                               textInput(inputId = "mapFilter", label= "Filter"),
-                              br(),
-                              br(),
+                              linebreaks(2),
                               
                               mainPanel(
                                 uiOutput("leaf")
                               ))),
                    tabPanel("Bactopia Summary", fluid=T,
                             fluidPage(
-                              selectInput(inputId= "sumOption", label="Select Column", choices = c(names(runSum[2:ncol(runSum)]))),
-                              br(),
-                              br(),
-                              br(),
+                              selectInput(inputId= "sumOption", label="Select Column", 
+                                          choices = c(names(runSum[2:ncol(runSum)]))),
+                              linebreaks(3),
                               mainPanel(
-                                br(),
-                                br(),
-                                br(),
-                                plotOutput("sumFig")
+                                linebreaks(3),
+                                plotOutput("sumFig", width="150%"),
+                                linebreaks(4),
+                                DT::dataTableOutput("bactSumDat", width = "150%")
                               )
                             ))
                    
@@ -105,7 +103,7 @@ ui <- navbarPage("Summary",
 
 server <- function(input, output) {
   
-  output$tree <- renderPlot({
+  selTree<- reactive({
     if (input$optionB==""){
       tips<-metaDat
     } else {
@@ -116,17 +114,34 @@ server <- function(input, output) {
       tips<-varOption[(varOption$varOption==input$optionB),]
     }
     selTips<-as.character(tips$uuid)
-    selTree<-ape::keep.tip(data, tip=selTips)
-    ggtree::ggtree(selTree)%<+% metaDat + 
-      geom_treescale() +
-      ggtitle("Samples Phylogenetic Tree")+
-      theme(plot.title = element_text(hjust = 0.5))+
-      geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border  
-      theme(legend.position = c(0.5,0.2), 
-            legend.title = element_blank(), # no title
-            legend.key = element_blank())+
+    selTipsTree<-ape::keep.tip(data, tip=selTips)
+    return(selTipsTree)
+    
+  })
+  
+  rootedTree<-eventReactive(input$goRoot, {
+    if (input$treeRoot==""){
+      rootTree<-selTree()
+    } else {
+      rootTree<-ape::root(selTree(), outgroup=input$treeRoot)
+    }
+    return(rootTree)
+  })
+  
+  output$tree <- renderPlot({
+    ggtree::ggtree(rootedTree())%<+% metaDat + 
+      #geom_treescale() +
+      geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
+      #xlim(0, 0.006)+
+      theme_tree2()+
+      hexpand(0.2, direction = 1)+
+      #theme(legend.position = c(0.5,0.2), 
+      #legend.title = element_blank(), # no title
+      #legend.key = element_blank())+
       theme(text = element_text(size = 24))+
-      guides(colour = guide_legend(override.aes = list(size=10)))
+      guides(colour = guide_legend(override.aes = list(size=10)))+
+      ggtitle("Samples Phylogenetic Tree")+
+      theme(plot.title = element_text(hjust = 0.5))
     
   })
   
@@ -146,6 +161,7 @@ server <- function(input, output) {
   output$Bar<-renderPlot({
     title0<-as.character(input$varOption)
     varSum<-data.frame(table(metaDat[,input$varOption]))
+    valMax<-max(varSum$Freq)+3
     ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
       geom_bar(stat="identity")+
       theme_classic()+
@@ -153,7 +169,8 @@ server <- function(input, output) {
       scale_fill_discrete(name = title0)+
       xlab(title0)+
       ggtitle(paste0("Frequency of samples for ", title0))+
-      theme(plot.title = element_text(hjust = 0.5))
+      theme(plot.title = element_text(hjust = 0.5))+
+      ylim(0, valMax)
     
   })
   
@@ -166,7 +183,7 @@ server <- function(input, output) {
       geom_hline(yintercept=0, color = "black", size=0.3)+
       theme_classic()+
       scale_x_date(NULL, date_labels="%b %Y",date_breaks  ="2 month")+
-    #scale_x_date(date_labels="%b %Y", breaks = unique(metaDat$Time))
+      #scale_x_date(date_labels="%b %Y", breaks = unique(metaDat$Time))
       theme(axis.title.y = element_blank())+
       theme(axis.text.y=element_blank(),
             axis.ticks.y=element_blank())+
@@ -211,24 +228,29 @@ server <- function(input, output) {
         scale_y_continuous(expand = c(0, 0.1))+
         ggtitle(paste0("Bactopia Run Summary"))+
         theme(plot.title = element_text(hjust = 0.5))
-        
+      
     } else{
       title0<-as.character(input$sumOption)
       varSum<-data.frame(table(runSum[,input$sumOption]))
+      valMax<-max(varSum$Freq)+3
       ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
         geom_bar(stat="identity")+
         theme_classic()+
         theme(text = element_text(size = 24))+ 
         scale_fill_discrete(name = title0)+
         xlab(title0)+
-        scale_y_continuous(expand = c(0, 0.1))+
+        #scale_y_continuous(expand = c(0, 0.1))+
         ggtitle(paste0("Bactopia Run Summary"))+
-        theme(plot.title = element_text(hjust = 0.5))
-        
+        theme(plot.title = element_text(hjust = 0.5))+
+        ylim(0, valMax)
+      
       
       
     }
   })
+  
+  output$bactSumDat <- DT::renderDataTable(
+    runSum, options = list(scrollX = TRUE))
   
 }
 

@@ -56,25 +56,16 @@ ui <- navbarPage("Summary",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
                               splitLayout(cellWidths=c("50%", "50%"), textInput(inputId = "optionB", label= "Filter"), 
                                           textInput(inputId = "treeRoot", label= "Root")),
-                              br(),
-                              br(),
-                              br(),
+                              linebreaks(1),
+                              actionButton(inputId ="goRoot", "Make Tree"),
+                              linebreaks(3),
                               mainPanel(
                                 plotOutput(outputId = "tree",width = "155%"),
-                                br(),
-                                br(),
-                                br(),
-                                br(),
+                                linebreaks(4),
                                 plotOutput(outputId="Time", width="150%"),
-                                br(),
-                                br(),
-                                br(),
-                                br(),
-                                br(),
+                                linebreaks(5),
                                 plotOutput("Bar", width = "150%"), 
-                                br(),
-                                br(),
-                                br(),
+                                linebreaks(3),
                                 plotOutput("Pie", width="150%")
                               )
                             )),
@@ -89,26 +80,20 @@ ui <- navbarPage("Summary",
                                           label = "Select Column",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
                               textInput(inputId = "mapFilter", label= "Filter"),
-                              br(),
-                              br(),
+                              linebreaks(2),
                               
                               mainPanel(
                                 uiOutput("leaf")
                               ))),
                    tabPanel("Bactopia Summary", fluid=T,
                             fluidPage(
-                              selectInput(inputId= "sumOption", label="Select Column", choices = c(names(runSum[2:ncol(runSum)]))),
-                              br(),
-                              br(),
-                              br(),
+                              selectInput(inputId= "sumOption", label="Select Column", 
+                                          choices = c(names(runSum[2:ncol(runSum)]))),
+                              linebreaks(3),
                               mainPanel(
-                                br(),
-                                br(),
-                                br(),
+                                linebreaks(3),
                                 plotOutput("sumFig", width="150%"),
-                                br(),
-                                br(),
-                                br(),
+                                linebreaks(4),
                                 DT::dataTableOutput("bactSumDat", width = "150%")
                               )
                             ))
@@ -118,7 +103,7 @@ ui <- navbarPage("Summary",
 
 server <- function(input, output) {
   
-  output$tree <- renderPlot({
+  selTree<- reactive({
     if (input$optionB==""){
       tips<-metaDat
     } else {
@@ -128,15 +113,23 @@ server <- function(input, output) {
       colnames(varOption)<-c("uuid", "varOption")
       tips<-varOption[(varOption$varOption==input$optionB),]
     }
-    
     selTips<-as.character(tips$uuid)
-    selTree<-ape::keep.tip(data, tip=selTips)
+    selTipsTree<-ape::keep.tip(data, tip=selTips)
+    return(selTipsTree)
+    
+  })
+  
+  rootedTree<-eventReactive(input$goRoot, {
     if (input$treeRoot==""){
-      rootTree<-selTree
+      rootTree<-selTree()
     } else {
-      rootTree<-ape::root(selTree, outgroup=input$treeRoot)
+      rootTree<-ape::root(selTree(), outgroup=input$treeRoot)
     }
-    ggtree::ggtree(rootTree)%<+% metaDat + 
+    return(rootTree)
+  })
+  
+  output$tree <- renderPlot({
+    ggtree::ggtree(rootedTree())%<+% metaDat + 
       #geom_treescale() +
       geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
       #xlim(0, 0.006)+
