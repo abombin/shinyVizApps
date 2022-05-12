@@ -5,8 +5,10 @@ ui <- navbarPage("Summary",
                               selectInput(inputId = "varOption",
                                           label = "Select Column",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
-                              splitLayout(cellWidths=c("50%", "50%"), textInput(inputId = "optionB", label= "Filter"), 
+                              splitLayout(cellWidths=c("50%", "50%"), textInput(inputId = "optionB", label= "Group"), 
                                           textInput(inputId = "treeRoot", label= "Root")),
+                              selectInput(inputId= "actionOption", label= "Branches Action",
+                                          choices=c("Highlight", "Subsample")),
                               linebreaks(1),
                               actionButton(inputId ="goRoot", "Make Tree"),
                               linebreaks(3),
@@ -65,34 +67,71 @@ server <- function(input, output) {
       tips<-varOption[(varOption$varOption==input$optionB),]
     }
     selTips<-as.character(tips$uuid)
-    selTipsTree<-ape::keep.tip(data, tip=selTips)
-    return(selTipsTree)
+    treeTips<-ape::keep.tip(data, tip=selTips)
+    return(treeTips)
     
+  })
+  
+  
+  selTipsTree<-reactive({
+    if (input$actionOption=="Highlight"){
+      tipsTree<-data
+    } else{
+      tipsTree<-selTree()
+    }
+    return(tipsTree)
   })
   
   rootedTree<-eventReactive(input$goRoot, {
     if (input$treeRoot==""){
-      rootTree<-selTree()
+      rootTree<-selTipsTree()
     } else {
-      rootTree<-ape::root(selTree(), outgroup=input$treeRoot)
+      rootTree<-ape::root(selTipsTree(), outgroup=input$treeRoot)
     }
     return(rootTree)
   })
   
+  
   output$tree <- renderPlot({
-    ggtree::ggtree(rootedTree())%<+% metaDat + 
-      #geom_treescale() +
-      geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
-      #xlim(0, 0.006)+
-      theme_tree2()+
-      hexpand(0.2, direction = 1)+
-      #theme(legend.position = c(0.5,0.2), 
-      #legend.title = element_blank(), # no title
-      #legend.key = element_blank())+
-      theme(text = element_text(size = 24))+
-      guides(colour = guide_legend(override.aes = list(size=10)))+
-      ggtitle("Samples Phylogenetic Tree")+
-      theme(plot.title = element_text(hjust = 0.5))
+    if (input$actionOption=="Subsample"){
+      ggtree::ggtree(rootedTree())%<+% metaDat + 
+        #geom_treescale() +
+        geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
+        #xlim(0, 0.006)+
+        theme_tree2()+
+        hexpand(0.2, direction = 1)+
+        #theme(legend.position = c(0.5,0.2), 
+        #legend.title = element_blank(), # no title
+        #legend.key = element_blank())+
+        theme(text = element_text(size = 24))+
+        guides(colour = guide_legend(override.aes = list(size=10)))+
+        ggtitle("Samples Phylogenetic Tree")+
+        theme(plot.title = element_text(hjust = 0.5))
+    } else if(input$actionOption=="Highlight"){
+      colInput<-data.frame(metaDat[, input$varOption])
+      uuid<-data.frame(metaDat$uuid)
+      varOption<-cbind(uuid, colInput)
+      colnames(varOption)<-c("uuid", "varOption")
+      tips<-varOption[(varOption$varOption==input$optionB),]
+      colTipGr<-as.character(tips$uuid)
+      tree<-rootedTree()
+      selTipsTree<-ggtree::groupOTU(tree, colTipGr)
+      ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
+        scale_color_manual(values=c("black", "red"))+
+        
+        #geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
+        geom_tiplab()+
+        theme_tree2()+
+        hexpand(0.2, direction = 1)+
+        #theme(legend.position = c(0.5,0.2), 
+        #legend.title = element_blank(), # no title
+        #legend.key = element_blank())+
+        theme(text = element_text(size = 24))+
+        guides(colour = guide_legend(override.aes = list(size=10)))+
+        ggtitle("Samples Phylogenetic Tree")+
+        theme(plot.title = element_text(hjust = 0.5))
+    }
+    
     
   })
   

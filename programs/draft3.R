@@ -69,7 +69,7 @@ server <- function(input, output) {
     selTips<-as.character(tips$uuid)
     treeTips<-ape::keep.tip(data, tip=selTips)
     return(treeTips)
-
+    
   })
   
   
@@ -117,9 +117,10 @@ server <- function(input, output) {
       tree<-rootedTree()
       selTipsTree<-ggtree::groupOTU(tree, colTipGr)
       ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
-        scale_color_manual(values=c("black", "blue"))+
-
-        #geom_tiplab(aes(color = .data[[input$varOption]]))+
+        scale_color_manual(values=c("black", "red"))+
+        
+        geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
+        #geom_tiplab()+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
         #theme(legend.position = c(0.5,0.2), 
@@ -130,7 +131,7 @@ server <- function(input, output) {
         ggtitle("Samples Phylogenetic Tree")+
         theme(plot.title = element_text(hjust = 0.5))
     }
-
+    
     
   })
   
