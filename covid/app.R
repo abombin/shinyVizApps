@@ -69,7 +69,7 @@ ui <- navbarPage("Summary",
                               ))),
                    tabPanel("Summary Stat", fluid=T,
                             fluidPage(
-                              selectInput(inputId = "varOption",
+                              selectInput(inputId = "summaryOption",
                                           label = "Select Column",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
                               
@@ -182,8 +182,8 @@ server <- function(input, output) {
   
   
   output$Pie<-renderPlot({
-    title0<-as.character(input$varOption)
-    varSum<-data.frame(table(metaDat[,input$varOption]))
+    title0<-as.character(input$summaryOption)
+    varSum<-data.frame(table(metaDat[,input$summaryOption]))
     ggplot(varSum, aes(x="", y=Freq, fill=Var1))+
       geom_bar(stat="identity", width=1)+
       coord_polar("y", start=0)+
@@ -194,8 +194,8 @@ server <- function(input, output) {
   }, res = 150)
   
   output$Bar<-renderPlot({
-    title0<-as.character(input$varOption)
-    varSum<-data.frame(table(metaDat[,input$varOption]))
+    title0<-as.character(input$summaryOption)
+    varSum<-data.frame(table(metaDat[,input$summaryOption]))
     valMax<-max(varSum$Freq)+3
     ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
       geom_bar(stat="identity")+
@@ -210,10 +210,10 @@ server <- function(input, output) {
   })
   
   output$Time<-renderPlot({
-    title0<-as.character(input$varOption)
+    title0<-as.character(input$summaryOption)
     time_plot<-ggplot(metaDat, aes(x=Time, y= PointPos))+
       geom_segment(data=metaDat, aes(y=PointPos,yend=0,xend=Time))+
-      geom_point(aes(color=.data[[input$varOption]]), size=3)+
+      geom_point(aes(color=.data[[input$summaryOption]]), size=3)+
       geom_text(data=metaDat, aes(y=TextPos, x= Time, label=uuid), size=2)+
       geom_hline(yintercept=0, color = "black", size=0.3)+
       theme_classic()+
