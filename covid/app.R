@@ -1,6 +1,8 @@
 # map needs on the server: sudo apt install libgdal-dev
+# to find capitals coordinates uses free https://simplemaps.com/data/world-cities
 
 #setwd("/home/ubuntu/github/shinyApp/shinyVizApps/covid")
+
 
 
 
@@ -8,8 +10,16 @@ library(shiny)
 library(ggtree)
 library(ggplot2)
 library(leaflet)
+library(plyr)
 
 data<-ape::read.tree(file = "./data/tree.nwk")
+
+usMap<-read.delim("./data/statesGeo.tsv", T, sep="\t")
+colnames(usMap)[3]<-"lng"
+
+worldMap<-read.delim("./data/countriesGeo2.tsv", T, sep="\t")
+colnames(worldMap)[4]<-"lng"
+
 
 rawDat<-read.delim("./data/metaData.tsv", T, sep="\t")
 rawDat$Time<-as.Date(rawDat$date, format="%Y-%m-%d")
@@ -40,7 +50,17 @@ for (year in dateNames){
   sumData<-rbind(sumData, procDat)
 }
 
-metaDat<-sumData
+usDat<-sumData[(sumData$country=="USA"),]
+usDatLoc<-plyr::join(usDat, usMap, by="division", type="left")
+
+worldDat<-sumData[!(sumData$country=="USA"),]
+worldDatLoc<-plyr::join(worldDat, worldMap, by="country", type="left", match="first")
+colnames(worldDatLoc)[36]<-"state"
+
+sumDataUS<-rbind(usDatLoc, worldDatLoc)
+
+
+metaDat<-subset(sumDataUS, select= -c(authors, originating_lab, submitting_lab))
 colnames(metaDat)[1]<-"uuid"
 
 linebreaks <- function(n){HTML(strrep(br(), n))}  # introduce multiple breaks in one function
@@ -72,7 +92,7 @@ ui <- navbarPage("Summary",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
                               
                               mainPanel(
-                                plotOutput(outputId="Time", width="150%"),
+                                plotOutput(outputId="Time", width="200%"),
                                 linebreaks(4),
                                 plotOutput("Bar", width = "150%")
                                 
@@ -222,7 +242,7 @@ server <- function(input, output) {
   },res = 150)
   
   output$metaDat <- DT::renderDataTable(
-    metaDat, options = list(scrollX = TRUE))
+    metaDat, options = list(scrollX = TRUE), rownames= FALSE)
   
   output$leaf=renderUI({
     leafletOutput('Map', width = "150%", height = 700)
@@ -278,8 +298,6 @@ server <- function(input, output) {
     }
   })
   
-  output$bactSumDat <- DT::renderDataTable(
-    runSum, options = list(scrollX = TRUE))
   
 }
 
