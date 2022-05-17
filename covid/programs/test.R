@@ -1,13 +1,8 @@
-# map needs on the server: sudo apt install libgdal-dev
-
-#setwd("/home/ubuntu/github/shinyApp/shinyVizApps/covid")
-
-
-
 library(shiny)
 library(ggtree)
 library(ggplot2)
 library(leaflet)
+
 
 data<-ape::read.tree(file = "./data/tree.nwk")
 
