@@ -1,18 +1,7 @@
-# map needs on the server: sudo apt install libgdal-dev
+data<-ape::read.tree(file = "./data/tree.nwk")
 
-#setwd("/home/ubuntu/github/shinyApp/IcmcVizApp")
-
-
-
-library(shiny)
-library(ggtree)
-library(ggplot2)
-library(leaflet)
-
-data<-ape::read.tree(file = "./data/staphylococcus-aureus_consensus.nwk")
-
-rawDat<-read.csv("./data/shinyMetadat.csv")
-rawDat$Time<-as.Date(rawDat$Time, format="%m/%d/%Y")
+rawDat<-read.delim("./data/metaData.tsv", T, sep="\t")
+rawDat$Time<-as.Date(rawDat$date, format="%Y-%m-%d")
 rawDat$Year<-format(rawDat$Time, format="%Y")
 byYear <- split(rawDat, rawDat$Year)
 dateNames <- names(byYear)
@@ -35,15 +24,13 @@ for (year in dateNames){
   procDat$poisiton<-pos
   
   procDat$PointPos<-procDat$poisiton*procDat$sign
-  procDat$TextPos<-(procDat$poisiton+0.2)*procDat$sign
+  procDat$TextPos<-(procDat$poisiton+0.8)*procDat$sign
   procDat$Time<-as.Date(procDat$Time, format="%m/%d/%Y")
   sumData<-rbind(sumData, procDat)
 }
 
 metaDat<-sumData
-
-runSum<-read.table("./data/bactopia-report.txt", T, sep="\t")
-colnames(runSum)[1]<-"uuid"
+colnames(metaDat)[1]<-"uuid"
 
 linebreaks <- function(n){HTML(strrep(br(), n))}  # introduce multiple breaks in one function
 
@@ -62,7 +49,7 @@ ui <- navbarPage("Summary",
                               actionButton(inputId ="goRoot", "Make Tree"),
                               linebreaks(3),
                               mainPanel(
-                                plotOutput(outputId = "tree",width = "155%"),
+                                plotOutput(outputId = "tree",width = "200%", height = "1500px"),
                                 linebreaks(4),
                                 DT::dataTableOutput("metaDat", width = "150%")
                                 
@@ -76,13 +63,7 @@ ui <- navbarPage("Summary",
                               mainPanel(
                                 plotOutput(outputId="Time", width="150%"),
                                 linebreaks(4),
-                                plotOutput("Bar", width = "150%"),
-                                linebreaks(3),
-                                selectInput(inputId= "sumOption", label="Select Column", 
-                                            choices = c(names(runSum[2:ncol(runSum)]))),
-                                plotOutput("sumFig", width="150%"),
-                                linebreaks(4),
-                                DT::dataTableOutput("bactSumDat", width = "150%")
+                                plotOutput("Bar", width = "150%")
                                 
                               ))),
                    tabPanel("Map", fluid=T,
@@ -149,9 +130,10 @@ server <- function(input, output) {
         #legend.title = element_blank(), # no title
         #legend.key = element_blank())+
         theme(text = element_text(size = 24))+
-        guides(colour = guide_legend(override.aes = list(size=10)))+
+        guides(colour = guide_legend(override.aes = list(size=6)))+
         ggtitle("Samples Phylogenetic Tree")+
-        theme(plot.title = element_text(hjust = 0.5))
+        theme(plot.title = element_text(hjust = 0.5))+
+        theme(legend.text=element_text(size=10))
     } else if(input$actionOption=="Highlight"){
       colInput<-data.frame(metaDat[, input$varOption])
       uuid<-data.frame(metaDat$uuid)
@@ -172,9 +154,10 @@ server <- function(input, output) {
         #legend.title = element_blank(), # no title
         #legend.key = element_blank())+
         theme(text = element_text(size = 24))+
-        guides(colour = guide_legend(override.aes = list(size=10)))+
+        guides(colour = guide_legend(override.aes = list(size=6)))+
         ggtitle("Samples Phylogenetic Tree")+
-        theme(plot.title = element_text(hjust = 0.5))
+        theme(plot.title = element_text(hjust = 0.5))+
+        theme(legend.text=element_text(size=10))
     }
     
     
@@ -213,15 +196,15 @@ server <- function(input, output) {
     title0<-as.character(input$varOption)
     time_plot<-ggplot(metaDat, aes(x=Time, y= PointPos))+
       geom_segment(data=metaDat, aes(y=PointPos,yend=0,xend=Time))+
-      geom_point(aes(color=.data[[input$varOption]]), size=3)+
+      geom_point(aes(color=.data[[input$varOption]]), size=2)+
       geom_text(data=metaDat, aes(y=TextPos, x= Time, label=uuid), size=2)+
       geom_hline(yintercept=0, color = "black", size=0.3)+
       theme_classic()+
       scale_x_date(NULL, date_labels="%b %Y",date_breaks  ="2 month")+
       #scale_x_date(date_labels="%b %Y", breaks = unique(metaDat$Time))
-      theme(axis.title.y = element_blank())+
-      theme(axis.text.y=element_blank(),
-            axis.ticks.y=element_blank())+
+      #theme(axis.title.y = element_blank())+
+      #theme(axis.text.y=element_blank(),
+           # axis.ticks.y=element_blank())+
       ggtitle("Sampling Time Line")+
       theme(plot.title = element_text(hjust = 0.5))
     time_plot

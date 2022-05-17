@@ -1,6 +1,6 @@
 # map needs on the server: sudo apt install libgdal-dev
 
-#setwd("/home/ubuntu/github/shinyApp/shinyVizApps/ICMC")
+#setwd("/home/ubuntu/github/shinyApp/shinyVizApps/covid")
 
 
 
