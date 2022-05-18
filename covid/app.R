@@ -11,6 +11,7 @@ library(ggtree)
 library(ggplot2)
 library(leaflet)
 library(plyr)
+library(plotly)
 
 data<-ape::read.tree(file = "./data/tree.nwk")
 

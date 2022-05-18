@@ -141,7 +141,7 @@ server <- function(input, output) {
       plotTree<-ggtree::ggtree(rootedTree())%<+% metaDat + 
         #geom_treescale() +
         #geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
-        geom_point(aes(color = .data[[input$varOption]]))+
+        #geom_point(aes(color = .data[[input$varOption]]))+
         #xlim(0, 0.006)+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
@@ -153,7 +153,10 @@ server <- function(input, output) {
         ggtitle("Samples Phylogenetic Tree")+
         theme(plot.title = element_text(hjust = 0.5))+
         theme(legend.text=element_text(size=10))
-      plotlyTree<-ggplotly(plotTree)
+      treeMet<-plotTree$data
+      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
+                                                       y = y, color=.data[[input$varOption]]))
+      plotlyTree<-ggplotly(plotMeta)
       plotlyTree
     } else if(input$actionOption=="Highlight"){
       colInput<-data.frame(metaDat[, input$varOption])
@@ -167,7 +170,7 @@ server <- function(input, output) {
       plotTree<-ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
         scale_color_manual(values=c("black", "red"))+
         
-        geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
+        #geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
         #geom_tiplab()+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
@@ -179,7 +182,10 @@ server <- function(input, output) {
         ggtitle("Samples Phylogenetic Tree")+
         theme(plot.title = element_text(hjust = 0.5))+
         theme(legend.text=element_text(size=10))
-      plotlyTree<-ggplotly(plotTree)
+      treeMet<-plotTree$data
+      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
+                                                       y = y, fill=.data[[input$varOption]]))
+      plotlyTree<-ggplotly(plotMeta)
       plotlyTree
       
     }
