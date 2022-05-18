@@ -1,3 +1,6 @@
+library(gplots)
+library(bipartite)
+
 data<-ape::read.tree(file = "./data/tree.nwk")
 
 usMap<-read.delim("./data/statesGeo.tsv", T, sep="\t")
@@ -67,7 +70,7 @@ ui <- navbarPage("Summary",
                               actionButton(inputId ="goRoot", "Make Tree"),
                               linebreaks(3),
                               mainPanel(
-                                plotOutput(outputId = "tree",width = "200%", height = "1500px"),
+                                plotlyOutput(outputId = "tree",width = "200%", height = "1500px"),
                                 linebreaks(4),
                                 DT::dataTableOutput("metaDat", width = "150%")
                                 
@@ -81,7 +84,13 @@ ui <- navbarPage("Summary",
                               mainPanel(
                                 plotlyOutput(outputId="Time", width="200%"),
                                 linebreaks(4),
-                                plotOutput("Bar", width = "150%")
+                                plotOutput("Bar", width = "135%"),
+                                linebreaks(4),
+                                sliderInput("varAbund", "Relative Abundance",
+                                            min = 0, max = 1,
+                                            value = 0.1, step = 0.05, width="35%"),
+                                linebreaks(2),
+                                plotOutput("HM", width = "120%", height = "800px")
                                 
                               ))),
                    tabPanel("Map", fluid=T,
@@ -136,11 +145,12 @@ server <- function(input, output) {
   })
   
   
-  output$tree <- renderPlot({
+  output$tree <- renderPlotly({
     if (input$actionOption=="Subsample"){
-      ggtree::ggtree(rootedTree())%<+% metaDat + 
+      plotTree<-ggtree::ggtree(rootedTree())%<+% metaDat + 
         #geom_treescale() +
-        geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
+        #geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
+        #geom_point(aes(color = .data[[input$varOption]]))+
         #xlim(0, 0.006)+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
@@ -152,6 +162,11 @@ server <- function(input, output) {
         ggtitle("Samples Phylogenetic Tree")+
         theme(plot.title = element_text(hjust = 0.5))+
         theme(legend.text=element_text(size=10))
+      treeMet<-plotTree$data
+      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
+                                                       y = y, color=.data[[input$varOption]]), size=2.5)
+      plotlyTree<-ggplotly(plotMeta)
+      plotlyTree
     } else if(input$actionOption=="Highlight"){
       colInput<-data.frame(metaDat[, input$varOption])
       uuid<-data.frame(metaDat$uuid)
@@ -161,10 +176,9 @@ server <- function(input, output) {
       colTipGr<-as.character(tips$uuid)
       tree<-rootedTree()
       selTipsTree<-ggtree::groupOTU(tree, colTipGr)
-      ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
+      plotTree<-ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
         scale_color_manual(values=c("black", "red"))+
-        
-        geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
+        #geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
         #geom_tiplab()+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
@@ -176,11 +190,16 @@ server <- function(input, output) {
         ggtitle("Samples Phylogenetic Tree")+
         theme(plot.title = element_text(hjust = 0.5))+
         theme(legend.text=element_text(size=10))
+      treeMet<-plotTree$data
+      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
+                                                       y = y, fill=.data[[input$varOption]]), size=2.5)
+      plotlyTree<-ggplotly(plotMeta)
+      plotlyTree
+      
     }
     
     
   })
-  
   
   output$Pie<-renderPlot({
     title0<-as.character(input$summaryOption)
@@ -208,6 +227,60 @@ server <- function(input, output) {
       theme(plot.title = element_text(hjust = 0.5))+
       ylim(0, valMax)
     
+  })
+  
+  output$HM<-renderPlot({
+    dfSub<-metaDat[, c(19,5)]
+    #dfSub<-df[, c(5,3)]
+    
+    colnames(dfSub)<-c("Lin", "Date")
+    dfSub$Date<-as.Date(dfSub$Date, format="%Y-%m-%d")
+    
+    dfSub$Date<-format(dfSub$Date, format="%Y-%m")
+    
+    # group by date
+    byDate <- split(dfSub, dfSub$Date)
+    dateNames <- names(byDate)
+    
+    # empty frames
+    sumData<-data.frame(matrix(ncol=4, nrow=0))
+    colnames(sumData)<-c("Lin", "Frequency", "Date", "Percentage")
+    #loop
+    for (i in dateNames){
+      title0<-i
+      data<-byDate[[i]]
+      freqData<-data.frame(table(data$Lin))
+      freqData$Date<-title0
+      total<-sum(freqData$Freq)
+      for (j in 1:nrow(freqData)){
+        freqData$Percentage[j]<-(freqData$Freq[j]/total)
+      }
+      colnames(freqData)<-c("Lin", "Frequency", "Date", "Percentage")
+      sumData<-rbind(sumData, freqData)
+    }
+    
+    # prepare to spread matrix
+    dfPrepSpr <- data.frame(higher = c(sumData$Date), 
+                            lower = c(sumData$Lin), 
+                            freq=c(sumData$Percentage), webID = c("X1_"))
+    
+    # spread matrix
+    sprArray<-bipartite::frame2webs(dfPrepSpr,type.out="array")
+    sprMatrix<-as.data.frame(sprArray)
+    colnames(sprMatrix) <-  sub(".X1_.*", "", colnames(sprMatrix))
+    
+    # order matrix by Percentage of abundance
+    
+    sprMatrix$Order <- rowSums( sprMatrix[,1:ncol(sprMatrix)])
+    sprMatrixOrd<-sprMatrix[order(sprMatrix$Order, decreasing = T),]
+    sprMatrixFilt<-sprMatrixOrd[rowSums(sprMatrixOrd[1:(ncol(sprMatrixOrd)-1)] >= input$varAbund) > 0, ]
+    # order matrix by Strain name
+    
+    plotMat<-as.matrix(sprMatrixFilt[, 1:(ncol(sprMatrixFilt)-1)])
+    
+    heatmap.2(plotMat, scale = "none", col = bluered(100), 
+              trace = "none", density.info = "none", dendrogram='none', Rowv=FALSE, Colv=FALSE, 
+              lhei=c(2, 12), lwid=c(2,12), margins = c(12, 13), cexCol = 1.5, cexRow = 1.5)
   })
   
   output$Time<-renderPlotly({
@@ -265,7 +338,6 @@ server <- function(input, output) {
         scale_y_continuous(expand = c(0, 0.1))+
         ggtitle(paste0("Bactopia Run Summary"))+
         theme(plot.title = element_text(hjust = 0.5))
-      
     } else{
       title0<-as.character(input$sumOption)
       varSum<-data.frame(table(runSum[,input$sumOption]))
