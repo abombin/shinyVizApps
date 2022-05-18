@@ -3,7 +3,7 @@ library(ggtree)
 library(ggplot2)
 library(leaflet)
 library(plyr)
-
+library(plotly)
 
 data<-ape::read.tree(file = "./data/tree.nwk")
 
@@ -25,7 +25,8 @@ sumData<-data.frame(matrix(ncol=9, nrow=0))
 #colnames(sumData)<-c("PangLin", "Frequency", "Date", "Percentage")
 
 for (year in dateNames){
-  procDat<-byYear[[year]]
+  subsampDat<-byYear[[year]]
+  procDat<-subsampDat[order(subsampDat$Time),]
   dfRow<-c(1:nrow(procDat))
   dfSub2 <- dfRow[seq(from=2, to=length(dfRow), by=2)]
   posSeq<-seq(from=0.25, by=0.25, length.out = (nrow(procDat)/2)) # make sequence that increases by 0.25
@@ -73,7 +74,7 @@ ui <- navbarPage("Summary",
                               actionButton(inputId ="goRoot", "Make Tree"),
                               linebreaks(3),
                               mainPanel(
-                                plotOutput(outputId = "tree",width = "200%", height = "1500px"),
+                                plotlyOutput(outputId = "tree",width = "200%", height = "1500px"),
                                 linebreaks(4),
                                 DT::dataTableOutput("metaDat", width = "150%")
                                 
@@ -85,7 +86,7 @@ ui <- navbarPage("Summary",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
                               
                               mainPanel(
-                                plotOutput(outputId="Time", width="200%"),
+                                plotlyOutput(outputId="Time", width="200%"),
                                 linebreaks(4),
                                 plotOutput("Bar", width = "150%")
                                 
@@ -142,11 +143,12 @@ server <- function(input, output) {
   })
   
   
-  output$tree <- renderPlot({
+  output$tree <- renderPlotly({
     if (input$actionOption=="Subsample"){
-      ggtree::ggtree(rootedTree())%<+% metaDat + 
+      plotTree<-ggtree::ggtree(rootedTree())%<+% metaDat + 
         #geom_treescale() +
-        geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
+        #geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
+        #geom_point(aes(color = .data[[input$varOption]]))+
         #xlim(0, 0.006)+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
@@ -158,6 +160,11 @@ server <- function(input, output) {
         ggtitle("Samples Phylogenetic Tree")+
         theme(plot.title = element_text(hjust = 0.5))+
         theme(legend.text=element_text(size=10))
+      treeMet<-plotTree$data
+      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
+                                                       y = y, color=.data[[input$varOption]]), size=2.5)
+      plotlyTree<-ggplotly(plotMeta)
+      plotlyTree
     } else if(input$actionOption=="Highlight"){
       colInput<-data.frame(metaDat[, input$varOption])
       uuid<-data.frame(metaDat$uuid)
@@ -167,10 +174,9 @@ server <- function(input, output) {
       colTipGr<-as.character(tips$uuid)
       tree<-rootedTree()
       selTipsTree<-ggtree::groupOTU(tree, colTipGr)
-      ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
+      plotTree<-ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
         scale_color_manual(values=c("black", "red"))+
-        
-        geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
+        #geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
         #geom_tiplab()+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
@@ -182,11 +188,16 @@ server <- function(input, output) {
         ggtitle("Samples Phylogenetic Tree")+
         theme(plot.title = element_text(hjust = 0.5))+
         theme(legend.text=element_text(size=10))
+      treeMet<-plotTree$data
+      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
+                                                       y = y, fill=.data[[input$varOption]]), size=2.5)
+      plotlyTree<-ggplotly(plotMeta)
+      plotlyTree
+      
     }
     
     
   })
-  
   
   output$Pie<-renderPlot({
     title0<-as.character(input$summaryOption)
@@ -216,12 +227,12 @@ server <- function(input, output) {
     
   })
   
-  output$Time<-renderPlot({
+  output$Time<-renderPlotly({
     title0<-as.character(input$summaryOption)
     time_plot<-ggplot(metaDat, aes(x=Time, y= PointPos))+
       geom_segment(data=metaDat, aes(y=PointPos,yend=0,xend=Time))+
-      geom_point(aes(color=.data[[input$summaryOption]]), size=2)+
-      geom_text(data=metaDat, aes(y=TextPos, x= Time, label=uuid), size=2)+
+      geom_point(aes(text=uuid, color=.data[[input$summaryOption]]), size=2)+
+      #geom_text(data=metaDat, aes(y=TextPos, x= Time, label=uuid), size=2)+
       geom_hline(yintercept=0, color = "black", size=0.3)+
       theme_classic()+
       scale_x_date(NULL, date_labels="%b %Y",date_breaks  ="2 month")+
@@ -231,8 +242,9 @@ server <- function(input, output) {
       # axis.ticks.y=element_blank())+
       ggtitle("Sampling Time Line")+
       theme(plot.title = element_text(hjust = 0.5))
-    time_plot
-  },res = 150)
+    plotlyTime<-ggplotly(time_plot)
+    plotlyTime
+  })
   
   output$metaDat <- DT::renderDataTable(
     metaDat, options = list(scrollX = TRUE), rownames= FALSE)
@@ -270,7 +282,6 @@ server <- function(input, output) {
         scale_y_continuous(expand = c(0, 0.1))+
         ggtitle(paste0("Bactopia Run Summary"))+
         theme(plot.title = element_text(hjust = 0.5))
-      
     } else{
       title0<-as.character(input$sumOption)
       varSum<-data.frame(table(runSum[,input$sumOption]))

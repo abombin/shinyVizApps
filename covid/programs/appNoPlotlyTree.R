@@ -13,6 +13,7 @@ library(leaflet)
 library(plyr)
 library(plotly)
 
+
 data<-ape::read.tree(file = "./data/tree.nwk")
 
 usMap<-read.delim("./data/statesGeo.tsv", T, sep="\t")
@@ -82,7 +83,7 @@ ui <- navbarPage("Summary",
                               actionButton(inputId ="goRoot", "Make Tree"),
                               linebreaks(3),
                               mainPanel(
-                                plotlyOutput(outputId = "tree",width = "200%", height = "1500px"),
+                                plotOutput(outputId = "tree",width = "200%", height = "1500px"),
                                 linebreaks(4),
                                 DT::dataTableOutput("metaDat", width = "150%")
                                 
@@ -151,12 +152,11 @@ server <- function(input, output) {
   })
   
   
-  output$tree <- renderPlotly({
+  output$tree <- renderPlot({
     if (input$actionOption=="Subsample"){
-      plotTree<-ggtree::ggtree(rootedTree())%<+% metaDat + 
+      ggtree::ggtree(rootedTree())%<+% metaDat + 
         #geom_treescale() +
-        #geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
-        #geom_point(aes(color = .data[[input$varOption]]))+
+        geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
         #xlim(0, 0.006)+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
@@ -168,11 +168,6 @@ server <- function(input, output) {
         ggtitle("Samples Phylogenetic Tree")+
         theme(plot.title = element_text(hjust = 0.5))+
         theme(legend.text=element_text(size=10))
-      treeMet<-plotTree$data
-      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
-                                                       y = y, color=.data[[input$varOption]]), size=2.5)
-      plotlyTree<-ggplotly(plotMeta)
-      plotlyTree
     } else if(input$actionOption=="Highlight"){
       colInput<-data.frame(metaDat[, input$varOption])
       uuid<-data.frame(metaDat$uuid)
@@ -182,9 +177,10 @@ server <- function(input, output) {
       colTipGr<-as.character(tips$uuid)
       tree<-rootedTree()
       selTipsTree<-ggtree::groupOTU(tree, colTipGr)
-      plotTree<-ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
+      ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
         scale_color_manual(values=c("black", "red"))+
-        #geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
+        
+        geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
         #geom_tiplab()+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
@@ -196,16 +192,11 @@ server <- function(input, output) {
         ggtitle("Samples Phylogenetic Tree")+
         theme(plot.title = element_text(hjust = 0.5))+
         theme(legend.text=element_text(size=10))
-      treeMet<-plotTree$data
-      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
-                                                       y = y, fill=.data[[input$varOption]]), size=2.5)
-      plotlyTree<-ggplotly(plotMeta)
-      plotlyTree
-      
     }
     
     
   })
+  
   
   output$Pie<-renderPlot({
     title0<-as.character(input$summaryOption)
@@ -290,6 +281,7 @@ server <- function(input, output) {
         scale_y_continuous(expand = c(0, 0.1))+
         ggtitle(paste0("Bactopia Run Summary"))+
         theme(plot.title = element_text(hjust = 0.5))
+      
     } else{
       title0<-as.character(input$sumOption)
       varSum<-data.frame(table(runSum[,input$sumOption]))
