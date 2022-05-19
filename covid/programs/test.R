@@ -87,9 +87,12 @@ ui <- navbarPage("Summary",
                               selectInput(inputId = "summaryOption",
                                           label = "Select Column",
                                           choices = c(names(metaDat[2:ncol(metaDat)]))),
+                              linebreaks(2),
+                              
+                              textInput(inputId = "varYear", label="Filter by Year"),
                               
                               mainPanel(
-                                plotlyOutput(outputId="Time", width="200%"),
+                                plotlyOutput(outputId="Time", width="180%"),
                                 linebreaks(4),
                                 plotOutput("Bar", width = "135%"),
                                 linebreaks(4),
@@ -233,13 +236,10 @@ server <- function(input, output) {
     
     colnames(dfSub)<-c("Lin", "Date")
     dfSub$Date<-as.Date(dfSub$Date, format="%Y-%m-%d")
-    
     dfSub$Date<-format(dfSub$Date, format="%Y-%m")
-    
     # group by date
     byDate <- split(dfSub, dfSub$Date)
     dateNames <- names(byDate)
-    
     # empty frames
     sumData<-data.frame(matrix(ncol=4, nrow=0))
     colnames(sumData)<-c("Lin", "Frequency", "Date", "Percentage")
@@ -256,7 +256,6 @@ server <- function(input, output) {
       colnames(freqData)<-c("Lin", "Frequency", "Date", "Percentage")
       sumData<-rbind(sumData, freqData)
     }
-    
     # prepare to spread matrix
     dfPrepSpr <- data.frame(higher = c(sumData$Date), 
                             lower = c(sumData$Lin), 
@@ -266,14 +265,11 @@ server <- function(input, output) {
     sprArray<-bipartite::frame2webs(dfPrepSpr,type.out="array")
     sprMatrix<-as.data.frame(sprArray)
     colnames(sprMatrix) <-  sub(".X1_.*", "", colnames(sprMatrix))
-    
     # order matrix by Percentage of abundance
-    
     sprMatrix$Order <- rowSums( sprMatrix[,1:ncol(sprMatrix)])
     sprMatrixOrd<-sprMatrix[order(sprMatrix$Order, decreasing = T),]
     sprMatrixFilt<-sprMatrixOrd[rowSums(sprMatrixOrd[1:(ncol(sprMatrixOrd)-1)] >= input$varAbund) > 0, ]
     # order matrix by Strain name
-    
     plotMat<-as.matrix(sprMatrixFilt[, 1:(ncol(sprMatrixFilt)-1)])
     
     heatmap.2(plotMat, scale = "none", col = bluered(100), 
@@ -281,21 +277,34 @@ server <- function(input, output) {
               lhei=c(2, 12), lwid=c(2,12), margins = c(12, 13), cexCol = 1.5, cexRow = 1.5)
   })
   
+  filterTime<-reactive({
+    if (input$varYear==""){
+      filtMet<-metaDat
+    } else {
+      filtMet<-metaDat[(metaDat$Year==input$varYear),]
+    }
+    return(filtMet)
+  })
+  
   output$Time<-renderPlotly({
+    df<-filterTime()
+    valMax<-max(df$TextPos)+1
+    valMin<-min(df$TextPos)-1
     title0<-as.character(input$summaryOption)
-    time_plot<-ggplot(metaDat, aes(x=Time, y= PointPos))+
-      geom_segment(data=metaDat, aes(y=PointPos,yend=0,xend=Time))+
+    time_plot<-ggplot(filterTime(), aes(x=Time, y= PointPos))+
+      geom_segment(data=filterTime(), aes(y=PointPos,yend=0,xend=Time))+
       geom_point(aes(text=uuid, color=.data[[input$summaryOption]]), size=2)+
-      #geom_text(data=metaDat, aes(y=TextPos, x= Time, label=uuid), size=2)+
+      #geom_text(data=filterTime(), aes(y=TextPos, x= Time, label=uuid), size=2)+
       geom_hline(yintercept=0, color = "black", size=0.3)+
       theme_classic()+
       scale_x_date(NULL, date_labels="%b %Y",date_breaks  ="2 month")+
-      #scale_x_date(date_labels="%b %Y", breaks = unique(metaDat$Time))
+      #scale_x_date(date_labels="%b %Y", breaks = unique(filterTime()$Time))
       theme(axis.title.y = element_blank())+
       theme(axis.text.y=element_blank(),
             axis.ticks.y=element_blank())+
       ggtitle("Sampling Time Line")+
-      theme(plot.title = element_text(hjust = 0.5))
+      theme(plot.title = element_text(hjust = 0.5))+
+      ylim(valMin, valMax)
     plotlyTime<-ggplotly(time_plot)
     plotlyTime
   })
