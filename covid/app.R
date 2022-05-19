@@ -162,24 +162,19 @@ server <- function(input, output) {
   
   output$tree <- renderPlotly({
     if (input$actionOption=="Subsample"){
-      plotTree<-ggtree::ggtree(rootedTree())%<+% metaDat + 
-        #geom_treescale() +
-        #geom_tiplab(aes(color = .data[[input$varOption]])) + # size of label border 
-        #geom_point(aes(color = .data[[input$varOption]]))+
-        #xlim(0, 0.006)+
+      
+      plotTree<-ggtree::ggtree(rootedTree())+ 
         theme_tree2()+
         hexpand(0.2, direction = 1)+
-        #theme(legend.position = c(0.5,0.2), 
-        #legend.title = element_blank(), # no title
-        #legend.key = element_blank())+
         theme(text = element_text(size = 24))+
-        guides(colour = guide_legend(override.aes = list(size=6)))+
         ggtitle("Samples Phylogenetic Tree")+
-        theme(plot.title = element_text(hjust = 0.5))+
+        theme(plot.title = element_text(hjust = 0.5))
+      metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='uuid'))
+      plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
+                                                        y = y, color=.data[[input$varOption]]), size=2.5)+
+        guides(colour = guide_legend(override.aes = list(size=6)))+
         theme(legend.text=element_text(size=10))
-      treeMet<-plotTree$data
-      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
-                                                       y = y, color=.data[[input$varOption]]), size=2.5)
+      
       plotlyTree<-ggplotly(plotMeta)
       plotlyTree
     } else if(input$actionOption=="Highlight"){
@@ -191,28 +186,24 @@ server <- function(input, output) {
       colTipGr<-as.character(tips$uuid)
       tree<-rootedTree()
       selTipsTree<-ggtree::groupOTU(tree, colTipGr)
-      plotTree<-ggtree::ggtree(selTipsTree, aes(color=group))%<+% metaDat + 
+      plotTree<-ggtree::ggtree(selTipsTree, aes(color=group)) + 
         scale_color_manual(values=c("black", "red"))+
-        #geom_tiplab(aes(fill = .data[[input$varOption]]), color="black", geom = "label")+
-        #geom_tiplab()+
         theme_tree2()+
         hexpand(0.2, direction = 1)+
-        #theme(legend.position = c(0.5,0.2), 
-        #legend.title = element_blank(), # no title
-        #legend.key = element_blank())+
         theme(text = element_text(size = 24))+
         guides(colour = guide_legend(override.aes = list(size=6)))+
         ggtitle("Samples Phylogenetic Tree")+
-        theme(plot.title = element_text(hjust = 0.5))+
+        theme(plot.title = element_text(hjust = 0.5))
+      
+      metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='uuid'))
+      plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
+                                                        y = y, fill=.data[[input$varOption]]), size=2.5)+
+        guides(colour = guide_legend(override.aes = list(size=6)))+
         theme(legend.text=element_text(size=10))
-      treeMet<-plotTree$data
-      plotMeta<-plotTree+geom_point(data=treeMet, aes( label=label, x = x,
-                                                       y = y, fill=.data[[input$varOption]]), size=2.5)
+      
       plotlyTree<-ggplotly(plotMeta)
       plotlyTree
-      
     }
-    
     
   })
   
@@ -310,7 +301,7 @@ server <- function(input, output) {
       #scale_x_date(date_labels="%b %Y", breaks = unique(metaDat$Time))
       theme(axis.title.y = element_blank())+
       theme(axis.text.y=element_blank(),
-       axis.ticks.y=element_blank())+
+            axis.ticks.y=element_blank())+
       ggtitle("Sampling Time Line")+
       theme(plot.title = element_text(hjust = 0.5))
     plotlyTime<-ggplotly(time_plot)
