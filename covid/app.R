@@ -85,7 +85,7 @@ ui <- navbarPage("Summary",
                               actionButton(inputId ="goRoot", "Make Tree"),
                               linebreaks(3),
                               mainPanel(
-                                plotlyOutput(outputId = "tree",width = "200%", height = "1500px"),
+                                plotlyOutput(outputId = "tree",width = "180%", height = "1200px"),
                                 linebreaks(4),
                                 DT::dataTableOutput("metaDat", width = "150%")
                                 
@@ -174,7 +174,7 @@ server <- function(input, output) {
         theme(plot.title = element_text(hjust = 0.5))
       metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='uuid'))
       plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
-                                                        y = y, color=.data[[input$varOption]]), size=2.5)+
+                                                        y = y, color=.data[[input$varOption]]), size=2)+
         guides(colour = guide_legend(override.aes = list(size=6)))+
         theme(legend.text=element_text(size=10))
       
@@ -200,7 +200,7 @@ server <- function(input, output) {
       
       metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='uuid'))
       plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
-                                                        y = y, fill=.data[[input$varOption]]), size=2.5)+
+                                                        y = y, fill=.data[[input$varOption]]), size=2)+
         guides(colour = guide_legend(override.aes = list(size=6)))+
         theme(legend.text=element_text(size=10))
       
