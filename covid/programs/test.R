@@ -6,7 +6,7 @@ library(plyr)
 library(plotly)
 library(gplots) # heatmap
 library(bipartite) # spread data table
-library(incidence2)
+library(incidence2) # epi curve
 
 
 data<-ape::read.tree(file = "./data/tree.nwk")
