@@ -14,6 +14,7 @@ library(plyr)
 library(plotly)
 library(gplots) # heatmap
 library(bipartite) # spread data table
+library(incidence2) # epi curve
 
 
 data<-ape::read.tree(file = "./data/tree.nwk")
@@ -108,7 +109,11 @@ ui <- navbarPage("Summary",
                                             min = 0, max = 1,
                                             value = 0.1, step = 0.05, width="35%"),
                                 linebreaks(2),
-                                plotOutput("HM", width = "120%", height = "800px")
+                                plotOutput("HM", width = "120%", height = "800px"),
+                                linebreaks(2),
+                                selectInput(inputId = "varEpi", label= "Select Column", choices=c(names(metaDat[2:ncol(metaDat)]))),
+                                linebreaks(2),
+                                plotlyOutput("Epi", width="135%")
                                 
                               ))),
                    tabPanel("Map", fluid=T,
@@ -342,35 +347,19 @@ server <- function(input, output) {
     m
   })
   
-  output$sumFig<-renderPlot({
+  output$Epi<-renderPlotly({
+    title0<-as.character(input$varEpi)
+    epiGroup <- incidence2::incidence(metaDat, date_index = date, interval = "month", groups = .data[[input$varEpi]],
+                                      na_as_group = TRUE)
+    epiPlot<-plot(epiGroup, fill = .data[[input$varEpi]])+
+      theme_classic()+
+      theme(text = element_text(size = 18))+ 
+      ggtitle(paste0("Frequency of samples per ", title0))+
+      theme(plot.title = element_text(hjust = 0.5))
+    epiPlotly<-ggplotly(epiPlot)
+    epiPlotly
     
-    histTable<-as.data.frame(runSum[,input$sumOption])
-    if (is.numeric(runSum[,input$sumOption])==T){
-      ggplot(runSum, aes(x=.data[[input$sumOption]])) +
-        geom_histogram(fill="#f8766d", alpha=1, position="identity")+
-        theme_classic()+
-        theme(text = element_text(size = 24))+
-        scale_y_continuous(expand = c(0, 0.1))+
-        ggtitle(paste0("Bactopia Run Summary"))+
-        theme(plot.title = element_text(hjust = 0.5))
-    } else{
-      title0<-as.character(input$sumOption)
-      varSum<-data.frame(table(runSum[,input$sumOption]))
-      valMax<-max(varSum$Freq)+3
-      ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
-        geom_bar(stat="identity")+
-        theme_classic()+
-        theme(text = element_text(size = 24))+ 
-        scale_fill_discrete(name = title0)+
-        xlab(title0)+
-        #scale_y_continuous(expand = c(0, 0.1))+
-        ggtitle(paste0("Bactopia Run Summary"))+
-        theme(plot.title = element_text(hjust = 0.5))+
-        ylim(0, valMax)
-      
-      
-      
-    }
+    
   })
   
   

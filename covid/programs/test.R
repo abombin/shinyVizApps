@@ -6,6 +6,7 @@ library(plyr)
 library(plotly)
 library(gplots) # heatmap
 library(bipartite) # spread data table
+library(incidence2)
 
 
 data<-ape::read.tree(file = "./data/tree.nwk")
@@ -77,7 +78,7 @@ ui <- navbarPage("Summary",
                               actionButton(inputId ="goRoot", "Make Tree"),
                               linebreaks(3),
                               mainPanel(
-                                plotlyOutput(outputId = "tree",width = "200%", height = "1500px"),
+                                plotlyOutput(outputId = "tree",width = "180%", height = "1200px"),
                                 linebreaks(4),
                                 DT::dataTableOutput("metaDat", width = "150%")
                                 
@@ -100,7 +101,11 @@ ui <- navbarPage("Summary",
                                             min = 0, max = 1,
                                             value = 0.1, step = 0.05, width="35%"),
                                 linebreaks(2),
-                                plotOutput("HM", width = "120%", height = "800px")
+                                plotOutput("HM", width = "120%", height = "800px"),
+                                linebreaks(2),
+                                selectInput(inputId = "varEpi", label= "Select Column", choices=c(names(metaDat[2:ncol(metaDat)]))),
+                                linebreaks(2),
+                                plotlyOutput("Epi", width="135%")
                                 
                               ))),
                    tabPanel("Map", fluid=T,
@@ -166,7 +171,7 @@ server <- function(input, output) {
         theme(plot.title = element_text(hjust = 0.5))
       metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='uuid'))
       plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
-                                                        y = y, color=.data[[input$varOption]]), size=2.5)+
+                                                        y = y, color=.data[[input$varOption]]), size=2)+
         guides(colour = guide_legend(override.aes = list(size=6)))+
         theme(legend.text=element_text(size=10))
       
@@ -192,7 +197,7 @@ server <- function(input, output) {
       
       metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='uuid'))
       plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
-                                                        y = y, fill=.data[[input$varOption]]), size=2.5)+
+                                                        y = y, fill=.data[[input$varOption]]), size=2)+
         guides(colour = guide_legend(override.aes = list(size=6)))+
         theme(legend.text=element_text(size=10))
       
@@ -210,7 +215,7 @@ server <- function(input, output) {
       coord_polar("y", start=0)+
       theme_void()+
       scale_fill_discrete(name = title0)+
-      ggtitle(paste0("Frequency of samples for ", title0))+
+      ggtitle(paste0("Frequency of samples per ", title0))+
       theme(plot.title = element_text(hjust = 0.5))
   }, res = 150)
   
@@ -224,7 +229,7 @@ server <- function(input, output) {
       theme(text = element_text(size = 24))+ 
       scale_fill_discrete(name = title0)+
       xlab(title0)+
-      ggtitle(paste0("Frequency of samples for ", title0))+
+      ggtitle(paste0("Frequency of samples per ", title0))+
       theme(plot.title = element_text(hjust = 0.5))+
       ylim(0, valMax)
     
@@ -334,35 +339,19 @@ server <- function(input, output) {
     m
   })
   
-  output$sumFig<-renderPlot({
+  output$Epi<-renderPlotly({
+    title0<-as.character(input$varEpi)
+    epiGroup <- incidence2::incidence(metaDat, date_index = date, interval = "month", groups = .data[[input$varEpi]],
+                                      na_as_group = TRUE)
+    epiPlot<-plot(epiGroup, fill = .data[[input$varEpi]])+
+      theme_classic()+
+      theme(text = element_text(size = 18))+ 
+      ggtitle(paste0("Frequency of samples per ", title0))+
+      theme(plot.title = element_text(hjust = 0.5))
+    epiPlotly<-ggplotly(epiPlot)
+    epiPlotly
     
-    histTable<-as.data.frame(runSum[,input$sumOption])
-    if (is.numeric(runSum[,input$sumOption])==T){
-      ggplot(runSum, aes(x=.data[[input$sumOption]])) +
-        geom_histogram(fill="#f8766d", alpha=1, position="identity")+
-        theme_classic()+
-        theme(text = element_text(size = 24))+
-        scale_y_continuous(expand = c(0, 0.1))+
-        ggtitle(paste0("Bactopia Run Summary"))+
-        theme(plot.title = element_text(hjust = 0.5))
-    } else{
-      title0<-as.character(input$sumOption)
-      varSum<-data.frame(table(runSum[,input$sumOption]))
-      valMax<-max(varSum$Freq)+3
-      ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
-        geom_bar(stat="identity")+
-        theme_classic()+
-        theme(text = element_text(size = 24))+ 
-        scale_fill_discrete(name = title0)+
-        xlab(title0)+
-        #scale_y_continuous(expand = c(0, 0.1))+
-        ggtitle(paste0("Bactopia Run Summary"))+
-        theme(plot.title = element_text(hjust = 0.5))+
-        ylim(0, valMax)
-      
-      
-      
-    }
+    
   })
   
   
