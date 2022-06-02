@@ -8,8 +8,7 @@ library(gplots) # heatmap
 library(bipartite) # spread data table
 library(incidence2) # epi curve
 
-
-data<-ape::read.tree(file = "./data/tree.nwk")
+linebreaks <- function(n){HTML(strrep(br(), n))}  # introduce multiple breaks in one function
 
 usMap<-read.delim("./data/statesGeo.tsv", T, sep="\t")
 colnames(usMap)[3]<-"lng"
@@ -17,226 +16,143 @@ colnames(usMap)[3]<-"lng"
 worldMap<-read.delim("./data/countriesGeo2.tsv", T, sep="\t")
 colnames(worldMap)[4]<-"lng"
 
-
-rawDat<-read.delim("./data/metaData.tsv", T, sep="\t")
-rawDat$Time<-as.Date(rawDat$date, format="%Y-%m-%d")
-rawDat$Year<-format(rawDat$Time, format="%Y")
-byYear <- split(rawDat, rawDat$Year)
-dateNames <- names(byYear)
-
-# empty frames
-sumData<-data.frame(matrix(ncol=9, nrow=0))
-#colnames(sumData)<-c("PangLin", "Frequency", "Date", "Percentage")
-
-for (year in dateNames){
-  subsampDat<-byYear[[year]]
-  procDat<-subsampDat[order(subsampDat$Time),]
-  dfRow<-c(1:nrow(procDat))
-  dfSub2 <- dfRow[seq(from=2, to=length(dfRow), by=2)]
-  posSeq<-seq(from=0.25, by=0.25, length.out = (nrow(procDat)/2)) # make sequence that increases by 0.25
-  
-  procDat$sign<-rep(c(1,-1))
-  pos<-vector()
-  for (i in posSeq){
-    pos<-append(pos, rep(i,2))
-  }
-  procDat$poisiton<-pos
-  
-  procDat$PointPos<-procDat$poisiton*procDat$sign
-  procDat$TextPos<-(procDat$poisiton+0.8)*procDat$sign
-  procDat$Time<-as.Date(procDat$Time, format="%m/%d/%Y")
-  sumData<-rbind(sumData, procDat)
-}
-
-usDat<-sumData[(sumData$country=="USA"),]
-usDatLoc<-plyr::join(usDat, usMap, by="division", type="left")
-
-worldDat<-sumData[!(sumData$country=="USA"),]
-worldDatLoc<-plyr::join(worldDat, worldMap, by="country", type="left", match="first")
-colnames(worldDatLoc)[36]<-"state"
-
-sumDataUS<-rbind(usDatLoc, worldDatLoc)
-
-
-metaDat<-subset(sumDataUS, select= -c(authors, originating_lab, submitting_lab))
-colnames(metaDat)[1]<-"uuid"
-
-linebreaks <- function(n){HTML(strrep(br(), n))}  # introduce multiple breaks in one function
-
 ui <- navbarPage("Summary",
                  tabsetPanel(
+                   tabPanel("Summary Stat", fluid=T,
+                            fluidPage(
+                              fileInput('target_upload', 'Upload Your Metadata',
+                                        accept = c('.tsv', '.txt')),
+                              
+                              mainPanel(
+                                DT::dataTableOutput("metaDat", width = "150%"),
+                                linebreaks(3),
+                                tags$div(title="Color plot by the input column",
+                                         textInput(inputId = "summaryOption",label = "Write Column Name")),
+                                linebreaks(2),
+                                plotlyOutput("Epi", width="135%"),
+                                linebreaks(2),
+                                plotlyOutput("Bar", width = "135%"),
+                                linebreaks(4),
+                                tags$div(title="Filter samples by the relative abundance of Pangolin lineages",
+                                         sliderInput("varAbund", "Relative Abundance",
+                                                     min = 0, max = 1,
+                                                     value = 0.1, step = 0.05, width="35%")),
+                                linebreaks(2),
+                                plotOutput("HM", width = "120%", height = "800px")
+                                
+                              ))),
+                   
                    tabPanel("Phylogeny", fluid=T,
                             fluidPage(
-                              selectInput(inputId = "varOption",
-                                          label = "Select Column",
-                                          choices = c(names(metaDat[2:ncol(metaDat)]))),
-                              splitLayout(cellWidths=c("50%", "50%"), textInput(inputId = "optionB", label= "Group"), 
-                                          textInput(inputId = "treeRoot", label= "Root")),
-                              selectInput(inputId= "actionOption", label= "Branches Action",
-                                          choices=c("Subsample","Highlight")),
+                              fileInput('treeUpload', 'Upload Your Newick Tree', accept = c('.nwk', '.txt')),
+                              tags$div(title="Color tips by the input column",
+                                       textInput(inputId = "varOption",label = "Select Column")),
+                              splitLayout(cellWidths=c("50%", "50%"), 
+                                          tags$div(title= "Subsample/highlight tree by the input value. 
+                                                   Input value should be in the column selected above",
+                                                   textInput(inputId = "optionB", label= "Group")), 
+                                          tags$div(title="Input the name of the sample to root the tree",
+                                                   textInput(inputId = "treeRoot", label= "Root"))
+                              ),
+                              tags$div(title="Select if based on the Grpup input option the branches should be hilghlited or 
+                                       tree should be subsampled",
+                                       selectInput(inputId= "actionOption", label= "Branches Action",
+                                                   choices=c("Highlight","Subsample"))
+                              ),
                               linebreaks(1),
                               actionButton(inputId ="goRoot", "Make Tree"),
                               linebreaks(3),
                               mainPanel(
-                                plotlyOutput(outputId = "tree",width = "180%", height = "1200px"),
-                                linebreaks(4),
-                                DT::dataTableOutput("metaDat", width = "150%")
-                                
-                              ))),
-                   tabPanel("Summary Stat", fluid=T,
-                            fluidPage(
-                              selectInput(inputId = "summaryOption",
-                                          label = "Select Column",
-                                          choices = c(names(metaDat[2:ncol(metaDat)]))),
-                              linebreaks(2),
-                              
-                              textInput(inputId = "varYear", label="Filter by Year"),
-                              
-                              mainPanel(
-                                plotlyOutput(outputId="Time", width="180%"),
-                                linebreaks(4),
-                                plotOutput("Bar", width = "135%"),
-                                linebreaks(4),
-                                sliderInput("varAbund", "Relative Abundance",
-                                            min = 0, max = 1,
-                                            value = 0.1, step = 0.05, width="35%"),
-                                linebreaks(2),
-                                plotOutput("HM", width = "120%", height = "800px"),
-                                linebreaks(2),
-                                selectInput(inputId = "varEpi", label= "Select Column", choices=c(names(metaDat[2:ncol(metaDat)]))),
-                                linebreaks(2),
-                                plotlyOutput("Epi", width="135%")
-                                
+                                plotlyOutput(outputId = "tree",width = "150%", height = "1000px"),
                               ))),
                    tabPanel("Map", fluid=T,
                             fluidPage(
                               br(),
-                              selectInput(inputId = "mapOption",
-                                          label = "Select Column",
-                                          choices = c(names(metaDat[2:ncol(metaDat)]))),
-                              textInput(inputId = "mapFilter", label= "Filter"),
+                              tags$div(title="Input column name based on which to filter the data",
+                                       textInput(inputId = "mapOption", label = "Write Column Nme")),
+                              tags$div(title="Input column's value to filter data",
+                                       textInput(inputId = "mapFilter", label= "Filter")),
                               linebreaks(2),
                               
-                              mainPanel(
-                                uiOutput("leaf")
-                              )))
+                              mainPanel(uiOutput("leaf"))
+                            ))
                  ))
 
+
 server <- function(input, output) {
-  
-  selTree<- reactive({
-    if (input$optionB==""){
-      tips<-metaDat
+  rawDat <- reactive({
+    inFile <- input$target_upload
+    if (is.null(inFile)){
+      rawDat<-read.delim("./data/metaData.tsv", T, sep="\t")
     } else {
-      colInput<-data.frame(metaDat[, input$varOption])
-      uuid<-data.frame(metaDat$uuid)
-      varOption<-cbind(uuid, colInput)
-      colnames(varOption)<-c("uuid", "varOption")
-      tips<-varOption[(varOption$varOption==input$optionB),]
+      rawDat<-read.delim(inFile$datapath,  T, sep="\t")
     }
-    selTips<-as.character(tips$uuid)
-    treeTips<-ape::keep.tip(data, tip=selTips)
-    return(treeTips)
-    
+    return(rawDat)
   })
   
-  
-  selTipsTree<-reactive({
-    if (input$actionOption=="Highlight"){
-      tipsTree<-data
-    } else{
-      tipsTree<-selTree()
-    }
-    return(tipsTree)
+  metaTab<-reactive({
+    metaDat<-subset(rawDat(), select= -c(authors, originating_lab, submitting_lab))
+    return(metaDat)
   })
   
-  rootedTree<-eventReactive(input$goRoot, {
-    if (input$treeRoot==""){
-      rootTree<-selTipsTree()
+  output$metaDat <- DT::renderDataTable(
+    metaTab(), options = list(scrollX = TRUE), rownames= FALSE)
+  
+  freqTab<-reactive({
+    if (input$summaryOption==""){
+      title0<-names(rawDat())[2]
+      varSum<-data.frame(table(rawDat()[,title0]))
     } else {
-      rootTree<-ape::root(selTipsTree(), outgroup=input$treeRoot)
+      title0<-as.character(input$summaryOption)
+      varSum<-data.frame(table(rawDat()[,input$summaryOption]))
     }
-    return(rootTree)
+    return(varSum)
   })
   
-  
-  output$tree <- renderPlotly({
-    if (input$actionOption=="Subsample"){
-      
-      plotTree<-ggtree::ggtree(rootedTree())+ 
-        theme_tree2()+
-        hexpand(0.2, direction = 1)+
-        theme(text = element_text(size = 24))+
-        ggtitle("Samples Phylogenetic Tree")+
-        theme(plot.title = element_text(hjust = 0.5))
-      metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='uuid'))
-      plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
-                                                        y = y, color=.data[[input$varOption]]), size=2)+
-        guides(colour = guide_legend(override.aes = list(size=6)))+
-        theme(legend.text=element_text(size=10))
-      
-      plotlyTree<-ggplotly(plotMeta)
-      plotlyTree
-    } else if(input$actionOption=="Highlight"){
-      colInput<-data.frame(metaDat[, input$varOption])
-      uuid<-data.frame(metaDat$uuid)
-      varOption<-cbind(uuid, colInput)
-      colnames(varOption)<-c("uuid", "varOption")
-      tips<-varOption[(varOption$varOption==input$optionB),]
-      colTipGr<-as.character(tips$uuid)
-      tree<-rootedTree()
-      selTipsTree<-ggtree::groupOTU(tree, colTipGr)
-      plotTree<-ggtree::ggtree(selTipsTree, aes(color=group)) + 
-        scale_color_manual(values=c("black", "red"))+
-        theme_tree2()+
-        hexpand(0.2, direction = 1)+
-        theme(text = element_text(size = 24))+
-        guides(colour = guide_legend(override.aes = list(size=6)))+
-        ggtitle("Samples Phylogenetic Tree")+
-        theme(plot.title = element_text(hjust = 0.5))
-      
-      metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='uuid'))
-      plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
-                                                        y = y, fill=.data[[input$varOption]]), size=2)+
-        guides(colour = guide_legend(override.aes = list(size=6)))+
-        theme(legend.text=element_text(size=10))
-      
-      plotlyTree<-ggplotly(plotMeta)
-      plotlyTree
+  summOpt<-reactive({
+    if (input$summaryOption==""){
+      title0<-names(rawDat())[2]
+    } else {
+      title0<-as.character(input$summaryOption)
     }
-    
+    return(title0)
   })
   
-  output$Pie<-renderPlot({
-    title0<-as.character(input$summaryOption)
-    varSum<-data.frame(table(metaDat[,input$summaryOption]))
-    ggplot(varSum, aes(x="", y=Freq, fill=Var1))+
-      geom_bar(stat="identity", width=1)+
-      coord_polar("y", start=0)+
-      theme_void()+
-      scale_fill_discrete(name = title0)+
+  output$Epi<-renderPlotly({
+    title0<-summOpt()
+    epiGroup <- incidence2::incidence(rawDat(), date_index = date, interval = "month", groups = .data[[title0]],
+                                      na_as_group = TRUE)
+    epiPlot<-plot(epiGroup, fill = .data[[title0]])+
+      theme_classic()+
+      theme(text = element_text(size = 16))+ 
       ggtitle(paste0("Frequency of samples per ", title0))+
       theme(plot.title = element_text(hjust = 0.5))
-  }, res = 150)
+    epiPlotly<-ggplotly(epiPlot)
+    epiPlotly
+    
+    
+  })
   
-  output$Bar<-renderPlot({
-    title0<-as.character(input$summaryOption)
-    varSum<-data.frame(table(metaDat[,input$summaryOption]))
+  output$Bar<-renderPlotly({
+    title0<-summOpt()
+    varSum<-freqTab()
     valMax<-max(varSum$Freq)+3
-    ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
+    pBar<-ggplot(data=varSum, aes(x=Var1, y=Freq, fill=Var1)) +
       geom_bar(stat="identity")+
       theme_classic()+
-      theme(text = element_text(size = 24))+ 
+      theme(text = element_text(size = 16))+ 
       scale_fill_discrete(name = title0)+
       xlab(title0)+
       ggtitle(paste0("Frequency of samples per ", title0))+
       theme(plot.title = element_text(hjust = 0.5))+
       ylim(0, valMax)
-    
+    barPlotly<-ggplotly(pBar)
+    barPlotly
   })
   
   output$HM<-renderPlot({
-    dfSub<-metaDat[, c(19,5)]
+    metaDat<-rawDat()
+    dfSub<-metaDat[, c('pango_lineage','date')]
     #dfSub<-df[, c(5,3)]
     
     colnames(dfSub)<-c("Lin", "Date")
@@ -282,79 +198,147 @@ server <- function(input, output) {
               lhei=c(2, 12), lwid=c(2,12), margins = c(12, 13), cexCol = 1.5, cexRow = 1.5)
   })
   
-  filterTime<-reactive({
-    if (input$varYear==""){
-      filtMet<-metaDat
+  upTree <- reactive({
+    inFile <- input$treeUpload
+    if (is.null(inFile)){
+      rawTree<-ape::read.tree(file = "./data/tree.nwk")
     } else {
-      filtMet<-metaDat[(metaDat$Year==input$varYear),]
+      rawTree<-ape::read.tree(file=inFile$datapath)
     }
-    return(filtMet)
+    return(rawTree)
   })
   
-  output$Time<-renderPlotly({
-    df<-filterTime()
-    valMax<-max(df$TextPos)+1
-    valMin<-min(df$TextPos)-1
-    title0<-as.character(input$summaryOption)
-    time_plot<-ggplot(filterTime(), aes(x=Time, y= PointPos))+
-      geom_segment(data=filterTime(), aes(y=PointPos,yend=0,xend=Time))+
-      geom_point(aes(text=uuid, color=.data[[input$summaryOption]]), size=2)+
-      #geom_text(data=filterTime(), aes(y=TextPos, x= Time, label=uuid), size=2)+
-      geom_hline(yintercept=0, color = "black", size=0.3)+
-      theme_classic()+
-      scale_x_date(NULL, date_labels="%b %Y",date_breaks  ="2 month")+
-      #scale_x_date(date_labels="%b %Y", breaks = unique(filterTime()$Time))
-      theme(axis.title.y = element_blank())+
-      theme(axis.text.y=element_blank(),
-            axis.ticks.y=element_blank())+
-      ggtitle("Sampling Time Line")+
-      theme(plot.title = element_text(hjust = 0.5))+
-      ylim(valMin, valMax)
-    plotlyTime<-ggplotly(time_plot)
-    plotlyTime
+  selTree<- reactive({
+    if (input$optionB==""){
+      tips<-rawDat()
+    } else {
+      rawDat=rawDat()
+      colInput<-data.frame(rawDat[, input$varOption])
+      uuid<-data.frame(rawDat$strain)
+      varOption<-cbind(uuid, colInput)
+      colnames(varOption)<-c("strain", "varOption")
+      tips<-varOption[(varOption$varOption==input$optionB),]
+    }
+    selTips<-as.character(tips$strain)
+    return(selTips)
+    
   })
   
-  output$metaDat <- DT::renderDataTable(
-    metaDat, options = list(scrollX = TRUE), rownames= FALSE)
+  selTips<-reactive({
+    tips<- selTree()
+    treeTips<-ape::keep.tip(upTree(), tip=tips)
+    return(treeTips)
+  })
+  
+  selTipsTree<-reactive({
+    if (input$actionOption=="Highlight"){
+      tipsTree<-upTree()
+    } else{
+      tipsTree<-selTips()
+    }
+    return(tipsTree)
+  })
+  
+  
+  rootedTree<-eventReactive(input$goRoot, {
+    if (input$treeRoot==""){
+      rootTree<-selTipsTree()
+    } else {
+      rootTree<-ape::root(selTipsTree(), outgroup=input$treeRoot)
+    }
+    return(rootTree)
+  })
+  
+  varOpt<-reactive({
+    if (input$varOption==""){
+      title0<-names(rawDat())[2]
+    } else {
+      title0<-as.character(input$varOption)
+    }
+    return(title0)
+  })
+  
+  output$tree <- renderPlotly({
+    metaDat<-rawDat()
+    title0<-varOpt()
+    title1<-selTree()
+    if (input$actionOption=="Subsample"){
+      plotTree<-ggtree::ggtree(rootedTree())+
+        theme_tree2()+
+        hexpand(0.2, direction = 1)+
+        theme(text = element_text(size = 24))+
+        ggtitle("Samples Phylogenetic Tree")+
+        theme(plot.title = element_text(hjust = 0.5))
+      
+      metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='strain'))
+      plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
+                                                        y = y, color=.data[[title0]]), size=2)+
+        guides(colour = guide_legend(override.aes = list(size=6)))+
+        theme(legend.text=element_text(size=10))
+      plotlyTree<-ggplotly(plotMeta)
+      plotlyTree
+      
+    } else if(input$actionOption=="Highlight"){
+      selTipsTree<-ggtree::groupOTU(rootedTree(), title1)
+      plotTree<-ggtree::ggtree(selTipsTree, aes(color=group)) + 
+        scale_color_manual(values=c("black", "red"))+
+        theme_tree2()+
+        hexpand(0.2, direction = 1)+
+        theme(text = element_text(size = 24))+
+        guides(colour = guide_legend(override.aes = list(size=6)))+
+        ggtitle("Samples Phylogenetic Tree")+
+        theme(plot.title = element_text(hjust = 0.5))
+      
+      metaTree<-plotTree$data%>% dplyr::inner_join(metaDat, c('label'='strain'))
+      plotMeta<-plotTree+geom_point(data=metaTree, aes( label=label, x = x,
+                                                        y = y, fill=.data[[title0]]), size=2)+
+        guides(colour = guide_legend(override.aes = list(size=6)))+
+        theme(legend.text=element_text(size=10))
+      
+      plotlyTree<-ggplotly(plotMeta)
+      plotlyTree
+    }
+    
+  })
+  
+  mapDat<-reactive({
+    sumData<-rawDat()
+    usDat<-sumData[(sumData$country=="USA"),]
+    usDatLoc<-plyr::join(usDat, usMap, by="division", type="left")
+    worldDat<-sumData[!(sumData$country=="USA"),]
+    worldDatLoc<-plyr::join(worldDat, worldMap, by="country", type="left", match="first")
+    colnames(worldDatLoc)[30]<-"state"
+    sumDataAll<-rbind(usDatLoc, worldDatLoc)
+    return(sumDataAll)
+  })
+  
+  mapColumn<-reactive({
+    if ((input$mapOption=="") | (input$mapFilter=="" )){
+      mapMeta<-mapDat()
+    } else {
+      metaDat<-mapDat()
+      colInput<-data.frame(metaDat[, input$mapOption])
+      uuid<-data.frame(metaDat$strain)
+      mapOption<-cbind(uuid, colInput)
+      colnames(mapOption)<-c("strain", "mapOption")
+      selId<-mapOption[(mapOption$mapOption==input$mapFilter),]
+      mapMeta<-metaDat[(metaDat$strain%in%selId$strain),]
+    }
+    return(mapMeta)
+  })
+  
+  output$Map<-renderLeaflet({
+    mapMeta<-mapColumn()
+    m<-leaflet(options = leafletOptions(zoomControl = T)) %>% 
+      addTiles() %>%
+      addMarkers(data = mapMeta, lat = ~ lat, lng = ~ lng, clusterOptions = markerClusterOptions(), 
+                 popup = ~strain)
+    m
+  })
   
   output$leaf=renderUI({
     leafletOutput('Map', width = "150%", height = 700)
   })
-  
-  output$Map<-renderLeaflet({
-    if (input$mapFilter==""){
-      mapMeta<-metaDat
-    } else {
-      colInput<-data.frame(metaDat[, input$mapOption])
-      uuid<-data.frame(metaDat$uuid)
-      mapOption<-cbind(uuid, colInput)
-      colnames(mapOption)<-c("uuid", "mapOption")
-      selId<-mapOption[(mapOption$mapOption==input$mapFilter),]
-      mapMeta<-metaDat[(metaDat$uuid%in%selId$uuid),]
-    }
-    m<-leaflet(options = leafletOptions(zoomControl = FALSE)) %>% 
-      addTiles() %>%
-      addMarkers(data = mapMeta, lat = ~ lat, lng = ~ lng, clusterOptions = markerClusterOptions(), 
-                 popup = ~uuid)
-    m
-  })
-  
-  output$Epi<-renderPlotly({
-    title0<-as.character(input$varEpi)
-    epiGroup <- incidence2::incidence(metaDat, date_index = date, interval = "month", groups = .data[[input$varEpi]],
-                                      na_as_group = TRUE)
-    epiPlot<-plot(epiGroup, fill = .data[[input$varEpi]])+
-      theme_classic()+
-      theme(text = element_text(size = 18))+ 
-      ggtitle(paste0("Frequency of samples per ", title0))+
-      theme(plot.title = element_text(hjust = 0.5))
-    epiPlotly<-ggplotly(epiPlot)
-    epiPlotly
-    
-    
-  })
-  
-  
 }
 
 shinyApp(ui, server)
